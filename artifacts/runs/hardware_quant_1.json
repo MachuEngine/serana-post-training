@@ -1,0 +1,10 @@
+{
+  "label": "sft-merged-awq (concurrency=8)",
+  "predicted_vram_gb": "3.82 GB weights (predicted)",
+  "measured_vram_gb": "5.8 GiB weights / ~19.3GB total @ util=0.9",
+  "step_time_or_ttft": "p50=0.091s p95=0.529s",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "183.8 tok/s",
+  "cost_usd": "-"
+}

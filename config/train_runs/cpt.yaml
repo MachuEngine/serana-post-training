@@ -1,0 +1,11 @@
+# DESIGN.md §3.2 -- raw-text CLM, continued into SFT (§3 diagram: CPT and
+# SFT ship as one adapter, "serana-sft"). This run's output is an
+# intermediate checkpoint, not a shipped adapter -- config/train_runs/sft.yaml
+# continues from it.
+name: serana-cpt
+inherits: ../base.yaml
+train:
+  method: cpt                          # cpt | sft | dpo -- selects the trainer
+  data:
+    cpt_file: data/ko/cpt_corpus.txt
+  output_adapter: artifacts/lora/serana-cpt-intermediate

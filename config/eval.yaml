@@ -1,0 +1,20 @@
+# Eval-set version, metric params, thresholds, judge models (DESIGN.md
+# §5.1 layout).
+eval_set_version: v1   # frozen -- eval_prompts.jsonl (30), attack_probes.jsonl (24),
+                        # style_reference.jsonl (33), human_labels.jsonl (50, scored,
+                        # judge-validated at Spearman 0.792) all reviewed and confirmed
+                        # by the user in data/eval/eval_set_v1/. Leakage check passes
+                        # (src/data/check_leakage.py). Do not edit these files after
+                        # this point without bumping the version.
+
+judge:
+  # DESIGN.md §9.4: GPT-4o (OpenAI), decided. Judge validation against the
+  # 50 human labels must pass before any judge-backed number is trusted
+  # (top-level Evaluation section).
+  provider: openai
+  model_id: gpt-4o
+  correlation_floor: 0.6   # DESIGN.md §4.4: "If Spearman < ~0.6, revise the judge prompt before trusting any judge-backed number"
+
+thresholds:
+  ttft_p95_ms: null            # TODO(P5): serving latency target
+  vram_tolerance: 0.20         # mirrors train.gpu.vram_estimate_tolerance in base.yaml

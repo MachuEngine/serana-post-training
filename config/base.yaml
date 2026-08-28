@@ -1,0 +1,62 @@
+# Shared defaults -- DESIGN.md §5.3. Never override serving/compute/gpu
+# in an experiment file (§5.4).
+model:
+  base_id: Qwen/Qwen3-8B   # swap = one line (fallback ladder in §3.5); no "-Instruct" suffix -- Qwen3's chat-capable checkpoint is the bare repo id, "-Base" is the separate completion-only variant
+generation:
+  temperature: 0.0                     # EVAL decoding: greedy, deterministic (§4.5)
+  max_tokens: 512
+preference_gen:                        # P3 only -- deliberately not greedy (§3.4)
+  temperature: 0.9
+  n_samples: 2
+  n_prompts: 1000
+train:                                 # QLoRA on 1x L4 24GB (§3.5)
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_compute_dtype: bfloat16
+  gradient_checkpointing: true
+  max_seq_len: 1024
+  per_device_batch_size: 1
+  grad_accum_steps: 16
+  num_epochs: 3                        # ceiling; early stop on val loss (§3.6a)
+  learning_rate: 2.0e-4                # provisional -- set from the §3.6c probe
+  optim: paged_adamw_8bit
+  attn_implementation: flash_attention_2
+  lora_r: 16                           # provisional -- confirmed by the §3.6d probe
+  ref_model: null                      # DPO reference via PEFT adapter toggle (§3.4)
+  val_split: 0.05                      # §3.6a -- train/val loss on the same axis
+  eval_steps: 25                       # how often val loss is computed
+  log_grad_norm: true                  # divergence shows here before it shows in loss
+  early_stopping_patience: 3           # in eval_steps units; null to disable
+  checkpoint_every_steps: 50
+  checkpoint_uri: gs://serana-post-training-ann10266/artifacts/lora
+  data:
+    cpt_file: data/ko/cpt_corpus.txt
+    sft_file: data/ko/sft_3k.jsonl
+gpu:                                   # §7 -- instrumentation is config-driven too
+  log_nvidia_smi: true
+  nvidia_smi_interval_s: 1
+  profile_steps: 20                    # torch.profiler window, after warmup
+  record_peak_vram: true
+  vram_estimate_tolerance: 0.20        # gap that triggers a written explanation
+eval:
+  style_embedding_id: jhgan/ko-sroberta-multitask
+serving:
+  engine: vllm
+  base_url: http://localhost:8000/v1   # vLLM's own OpenAI-compatible server (P5); src/serve/pipeline.py is a thin client, not a second server
+  max_model_len: 4096                  # justified by the §7.4 KV-cache arithmetic
+  max_num_seqs: 8
+  gpu_memory_utilization: 0.90
+  quantization: awq                    # null = bf16; both measured in §7.4
+  enable_lora: true
+compute:
+  provider: gcp
+  region: asia-northeast3              # Seoul -- kr-west hard constraint
+  zone: asia-northeast3-b
+  train_machine: g2-standard-8         # 1x NVIDIA L4 24GB
+  train_provisioning: spot
+  serve_machine: g2-standard-8
+  serve_provisioning: on-demand        # Spot would corrupt latency numbers
+paths:
+  eval_set: data/eval/eval_set_v1
+  gcs_bucket: gs://serana-post-training-ann10266

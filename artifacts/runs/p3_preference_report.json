@@ -1,0 +1,9 @@
+{
+  "n_pairs_generated": 893,
+  "n_near_duplicate_discarded": 1,
+  "n_tie_discarded": 55,
+  "n_judge_error": 0,
+  "n_final_preference_pairs": 837,
+  "tie_rate": 0.0616,
+  "near_dup_rate": 0.0011
+}

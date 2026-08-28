@@ -1,0 +1,9 @@
+{
+  "n": 50,
+  "spearman": 0.7338,
+  "exact_agreement": 0.62,
+  "within_1_agreement": 0.94,
+  "violation_flag_agreement": 0.92,
+  "correlation_floor": 0.6,
+  "passes_floor": true
+}

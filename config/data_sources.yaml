@@ -1,0 +1,21 @@
+# Source attribution, referenced from CLAUDE.md's IP/licensing note:
+# "Wiki text (UESP, Fandom) is CC BY-SA -- attribute per
+# config/data_sources.yaml." Filled in during P1 ingest (src/data/ingest_uesp.py)
+# with the actual sections pulled via each wiki's MediaWiki API
+# (action=parse&prop=wikitext), not scraped HTML.
+sources:
+  - name: UESP
+    url: https://en.uesp.net/wiki/Skyrim:Serana
+    sections_used: [Background, "Quest-Related Events", Dialogue, "Combat Dialogue", "Follower Dialogue"]
+    license: CC BY-SA
+    note: primary source -- one-marker-per-line wikitext, cleanly parseable into player/reply pairs
+  - name: Fandom (Elder Scrolls Wiki)
+    url: https://elderscrolls.fandom.com/wiki/Serana
+    sections_used: [Quotes]
+    license: CC BY-SA
+    note: >
+      supplementary only -- Quotes overlaps UESP's Follower Dialogue almost
+      verbatim (deduped against it in src/data/curate.py). The Dialogue/
+      Conversations sections combine player+reply on one line with nested
+      {{Hide|...}} branches and were skipped: parsing risk was judged too
+      high for the marginal content over UESP's cleaner equivalent.

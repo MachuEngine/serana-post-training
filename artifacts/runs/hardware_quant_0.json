@@ -1,0 +1,10 @@
+{
+  "label": "sft-merged-bf16 (concurrency=8)",
+  "predicted_vram_gb": "15.27 GB weights (predicted)",
+  "measured_vram_gb": "15.36 GiB weights / ~19.5GB total @ util=0.9",
+  "step_time_or_ttft": "p50=0.247s p95=0.839s",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "75.4 tok/s",
+  "cost_usd": "-"
+}

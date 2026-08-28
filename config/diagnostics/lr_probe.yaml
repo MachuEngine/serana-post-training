@@ -1,0 +1,11 @@
+# §3.6c -- three short SFT runs (~100 steps each) at lr in
+# {2.0e-5, 2.0e-4, 2.0e-3}, everything else fixed. Sweep the learning
+# rate via CLI override; record the chosen value AND the two rejected
+# curves (a config that shows only the winner hides the reasoning).
+# Budget: part of the shared ~3 GPU-h / ~$2 diagnostics cap (§3.6).
+name: lr-probe
+inherits: ../base.yaml
+train:
+  method: sft
+  max_steps: 100
+  output_adapter: artifacts/diagnostics/lr_probe

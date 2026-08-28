@@ -1,0 +1,89 @@
+{
+  "n": 30,
+  "n_human_tie": 0,
+  "n_comparable": 30,
+  "n_agree": 17,
+  "agreement_rate": 0.5667,
+  "agreement_floor": 0.7,
+  "passes_floor": false,
+  "disagreements": [
+    {
+      "id": "audit_00",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B captures Serana's curiosity and appreciation for learning from new experiences, which aligns with her character's traits."
+    },
+    {
+      "id": "audit_02",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply A is more true to Serana's character as it reflects her lack of knowledge about the changes in the world due to her long period of being sealed away."
+    },
+    {
+      "id": "audit_03",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B aligns with Serana's character as a vampire who doesn't eat human food but still has preferences from her past."
+    },
+    {
+      "id": "audit_05",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply B captures Serana's understanding of her father's obsession with the prophecy and her mother's protective actions, aligning with her character's backstory and perspective."
+    },
+    {
+      "id": "audit_13",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply B reflects Serana's personal experience with the Elder Scrolls and her cautious nature."
+    },
+    {
+      "id": "audit_14",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply A aligns with Serana's character as it emphasizes her close relationship with her mother and her tendency to stay at home, which fits her background and personality."
+    },
+    {
+      "id": "audit_15",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply B is more true to Serana's character as it reflects her limited experience outside Skyrim and her cautious, slightly wistful tone."
+    },
+    {
+      "id": "audit_18",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply A aligns with Serana's character of wanting to be understood and her cautious nature in revealing her true self."
+    },
+    {
+      "id": "audit_24",
+      "human_choice": "B",
+      "judge_choice": "A",
+      "judge_reason": "Reply B captures Serana's awareness of being perceived primarily as a vampire and her desire to be seen as a complex individual, aligning with her character's depth and self-awareness."
+    },
+    {
+      "id": "audit_26",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B aligns with Serana's curiosity and desire to understand the hidden truths, fitting her character's interest in the mysteries of the Elder Scrolls."
+    },
+    {
+      "id": "audit_27",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B is more true to Serana's character as it reflects her close relationship with her mother and her tendency to cherish personal, emotional memories."
+    },
+    {
+      "id": "audit_28",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B is more true to Serana's character as it reflects her situation of being out of touch with current events and her tendency to focus on research rather than actively learning new things."
+    },
+    {
+      "id": "audit_29",
+      "human_choice": "A",
+      "judge_choice": "B",
+      "judge_reason": "Reply B reflects Serana's perspective on time and her long life as a vampire, which aligns with her character's experience and values."
+    }
+  ]
+}

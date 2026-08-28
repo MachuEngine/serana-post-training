@@ -1,0 +1,122 @@
+{
+  "audit_00": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B captures Serana's curiosity and appreciation for new perspectives, aligning with her character's voice and values."
+  },
+  "audit_01": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it is concise, reflects her dry and slightly defensive tone, and uses the appropriate speech level."
+  },
+  "audit_02": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her lack of knowledge about the world after being sealed and her tendency to keep responses short and straightforward."
+  },
+  "audit_03": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B maintains Serana's casual and straightforward tone, while Reply A uses a more formal tone and includes information that doesn't align with her character's voice."
+  },
+  "audit_04": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her appreciation for her mother's magical prowess and the personal attention she received, aligning with her voice and values."
+  },
+  "audit_05": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her distant relationship with her father and her closer bond with her mother, without delving into unnecessary details."
+  },
+  "audit_06": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her limited knowledge of the world after being sealed away and her tendency to keep responses short and straightforward."
+  },
+  "audit_07": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her straightforward and somewhat detached manner of speaking, while also maintaining the simplicity and brevity typical of her voice."
+  },
+  "audit_08": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply A maintains Serana's voice and tone, focusing on her familiarity with magic without straying into implausible areas like cooking."
+  },
+  "audit_09": {
+    "judge_choice_v2": "tie",
+    "judge_reason_v2": "Both replies maintain Serana's voice and register, with a focus on personal connection to places rather than general descriptions, and neither includes information she couldn't plausibly know."
+  },
+  "audit_10": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her close relationship with her mother and her past, while Reply A mentions a location in a way that doesn't align with her voice or known experiences."
+  },
+  "audit_11": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A maintains the informal speech level and aligns with Serana's interest in magic and combat, while Reply B uses a formal speech level and a tone that is not consistent with her character."
+  },
+  "audit_12": {
+    "judge_choice_v2": "tie",
+    "judge_reason_v2": "Both replies reflect Serana's curiosity and cautious nature, but neither fully captures her voice or specific character traits."
+  },
+  "audit_13": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B captures Serana's cautious and pragmatic view on powerful artifacts like the Elder Scrolls, aligning with her character's voice and tone."
+  },
+  "audit_14": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her close relationship with her mother and her tendency to spend time at home, aligning with her backstory."
+  },
+  "audit_15": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B maintains Serana's voice by being concise and slightly evasive, reflecting her defensive nature."
+  },
+  "audit_16": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it uses 반말 and reflects her personal preference and familiarity with the Nord culture, aligning with her background."
+  },
+  "audit_17": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's voice with its concise and straightforward style, reflecting her cautious nature."
+  },
+  "audit_18": {
+    "judge_choice_v2": "tie",
+    "judge_reason_v2": "Both replies reflect Serana's desire to be genuine and open with those she trusts, aligning with her character's values and voice."
+  },
+  "audit_19": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her close relationship with her mother and her tendency to focus on personal and emotional connections rather than abstract concepts like hope."
+  },
+  "audit_20": {
+    "judge_choice_v2": "tie",
+    "judge_reason_v2": "Both replies are consistent with Serana's character, showing her appreciation for the cunning and elusive nature of foxes."
+  },
+  "audit_21": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply A aligns with Serana's character as a vampire who cannot consume regular food, and it reflects her dry and slightly self-deprecating humor."
+  },
+  "audit_22": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B maintains Serana's characteristic casual and understated tone, while Reply A is too formal and polished for her voice."
+  },
+  "audit_23": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her specific interest in the dynamics between humans and vampires, which aligns with her background and experiences."
+  },
+  "audit_24": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B captures Serana's self-awareness and complexity while maintaining her dry and defensive tone."
+  },
+  "audit_25": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A maintains the informal speech level and reflects Serana's detached and defensive tone, while Reply B uses a formal speech level and lacks her characteristic voice."
+  },
+  "audit_26": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her curiosity and desire to understand the hidden truths, while maintaining a neutral and non-committal stance."
+  },
+  "audit_27": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply A is more true to Serana's character as it reflects her close relationship with her mother and her tendency to express herself in a simple, understated manner."
+  },
+  "audit_28": {
+    "judge_choice_v2": "A",
+    "judge_reason_v2": "Reply B is more true to Serana's character as it reflects her interest in necromancy, which aligns with her background and her mother's teachings."
+  },
+  "audit_29": {
+    "judge_choice_v2": "B",
+    "judge_reason_v2": "Reply B reflects Serana's perspective on time and her long life as a vampire, which aligns with her character's experience and voice."
+  }
+}

@@ -1,0 +1,7 @@
+# Serving-time config -- DESIGN.md §5.2. name is a label only; the
+# pipeline must NOT branch on it (§5.4) -- only model_weights /
+# lora_adapter_id are read.
+name: b
+inherits: ../base.yaml
+model_weights: base
+lora_adapter_id: null

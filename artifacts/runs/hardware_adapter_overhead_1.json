@@ -1,0 +1,10 @@
+{
+  "label": "sft-merged-bf16 (no adapter, concurrency=8)",
+  "predicted_vram_gb": "-",
+  "measured_vram_gb": "-",
+  "step_time_or_ttft": "p50=0.247s p95=0.839s",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "75.4 tok/s",
+  "cost_usd": "-"
+}

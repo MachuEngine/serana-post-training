@@ -1,0 +1,4 @@
+name: sft
+inherits: ../base.yaml
+model_weights: lora
+lora_adapter_id: serana-sft

@@ -1,0 +1,16 @@
+# DESIGN.md §5.2 / §3.4. Continues the SFT adapter; reference model is
+# the same weights with the adapter disabled (train.ref_model: null in
+# base.yaml), not a second resident model.
+name: serana-dpo
+inherits: ../base.yaml
+train:
+  method: dpo                          # cpt | sft | dpo -- selects the trainer
+  init_adapter: artifacts/lora/serana-sft
+  data:
+    preference_file: data/ko/prefs_1k.jsonl
+  dpo:
+    beta: 0.1                          # KL strength -- the main knob (§3.4)
+    learning_rate: 5.0e-6               # ~1 order of magnitude below SFT (§3.4)
+    num_epochs: 1                       # DPO overfits preference sets quickly (§3.4)
+    grad_accum_steps: 8                 # DPO processes chosen+rejected (§3.5)
+  output_adapter: artifacts/lora/serana-dpo

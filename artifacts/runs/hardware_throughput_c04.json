@@ -1,0 +1,10 @@
+{
+  "label": "sft-lora-bf16 (concurrency=4)",
+  "predicted_vram_gb": "-",
+  "measured_vram_gb": "-",
+  "step_time_or_ttft": "p50=0.207s p95=0.406s",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "44.6 tok/s",
+  "cost_usd": "-"
+}

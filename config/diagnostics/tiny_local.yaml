@@ -1,0 +1,20 @@
+# §3.6b failure sandbox base -- Qwen3-0.6B on the M5, local/CPU-or-MPS
+# only, no GPU spend. Never produces a shipped adapter (§5.4) -- writes to
+# artifacts/diagnostics/ and gets no row in the results tables.
+# NOTE: the original P1 sandbox run (artifacts/diagnostics/) used
+# Qwen2.5-0.5B-Instruct, before the base model moved to Qwen3 -- that run
+# log is accurate history and wasn't rewritten. This config is what a
+# fresh run uses going forward.
+name: tiny-local
+inherits: ../base.yaml
+model:
+  base_id: Qwen/Qwen3-0.6B
+train:
+  method: sft
+  output_adapter: artifacts/diagnostics/tiny
+
+# Each break overrides one or two fields from the CLI (§3.6b):
+#   divergence   -> train.learning_rate: 2.0e-2
+#   underfitting -> train.lora_r: 2, train.learning_rate: 2.0e-5
+#   overfitting  -> train.data.limit: 200, train.num_epochs: 20
+#   data leak    -> train.data.inject_eval_prompts: 5

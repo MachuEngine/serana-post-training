@@ -216,3 +216,28 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific (DESIGN.md §6) -- large/generated, not source.
+# data/eval/ is NOT listed here: it's the small, curated, hand-built eval
+# set (30 prompts + 24 attack probes + 50 human labels) -- it needs to be
+# committed for the "a stranger can reproduce from the repo" criterion (P6).
+/data/raw/*
+!/data/raw/.gitkeep
+/data/ko/*
+!/data/ko/.gitkeep
+/artifacts/lora/*
+!/artifacts/lora/.gitkeep
+/artifacts/diagnostics/*
+!/artifacts/diagnostics/.gitkeep
+# artifacts/runs/ is NOT blanket-ignored (unlike lora/diagnostics/merged
+# below, which hold real model binaries): every run log, results table,
+# and raw eval-generation dump in there is small (<500KB total as of P5)
+# and is exactly the predicted-vs-measured evidence CLAUDE.md's working
+# principles are about -- same reasoning as data/eval/ above.
+/artifacts/merged/*
+!/artifacts/merged/.gitkeep
+
+# Personal learning notes, not part of the public portfolio repo
+# (confirmed with the user, P6) -- HARNESS_ENGINEERING.md and everything
+# else here is meant to be public.
+/LEARNING.md

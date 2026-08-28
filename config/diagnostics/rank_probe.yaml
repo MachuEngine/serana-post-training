@@ -1,0 +1,12 @@
+# §3.6d -- r in {4, 16, 64} at the chosen lr (from lr_probe.yaml). Compare
+# on val loss, trainable-param count, peak VRAM, step time, and a
+# 10-prompt eyeball read. Cut first if the diagnostics budget tightens.
+name: rank-probe
+inherits: ../base.yaml
+train:
+  method: sft
+  max_steps: 100   # was missing -- without it this runs the full 3 epochs
+                    # (~534 steps, same as real SFT) instead of a short probe.
+                    # Caught before running, matching lr_probe.yaml's pattern.
+  learning_rate: 2.0e-4   # placeholder -- set to the §3.6c winner before running
+  output_adapter: artifacts/diagnostics/rank_probe

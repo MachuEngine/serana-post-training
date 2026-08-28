@@ -1,0 +1,4 @@
+name: dpo                     # label only -- pipeline must NOT branch on this
+inherits: ../base.yaml
+model_weights: lora
+lora_adapter_id: serana-dpo

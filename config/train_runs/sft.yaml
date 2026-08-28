@@ -1,0 +1,11 @@
+# DESIGN.md §3.3 -- continues the CPT intermediate checkpoint (each stage
+# continues the previous adapter, §3.5). Output is the adapter that
+# config/experiments/sft.yaml (and dpo.yaml, via init_adapter below) serve.
+name: serana-sft
+inherits: ../base.yaml
+train:
+  method: sft
+  init_adapter: artifacts/lora/serana-cpt-intermediate
+  data:
+    sft_file: data/ko/sft_3k.jsonl
+  output_adapter: artifacts/lora/serana-sft

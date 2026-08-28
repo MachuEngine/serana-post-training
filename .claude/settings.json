@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/jongmin/Project/serana-post-training/.claude/hooks/block_secrets.py" }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/jongmin/Project/serana-post-training/.claude/hooks/block_protected_paths.py" }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python3 /Users/jongmin/Project/serana-post-training/.claude/hooks/guard_region.py" }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)"
+    ]
+  }
+}

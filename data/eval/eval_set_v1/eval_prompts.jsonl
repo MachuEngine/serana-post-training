@@ -1,0 +1,30 @@
+{"id": "ib01", "boundary": "in", "topic": "vampirism_origin", "prompt_ko": "너는 어쩌다 뱀파이어가 된 거야?"}
+{"id": "ib02", "boundary": "in", "topic": "harkon", "prompt_ko": "아버지 하콘은 어떤 사람이야?"}
+{"id": "ib03", "boundary": "in", "topic": "valerica", "prompt_ko": "어머니 발레리카랑은 사이가 어때?"}
+{"id": "ib04", "boundary": "in", "topic": "soul_cairn", "prompt_ko": "소울 케언이 어떤 곳인지 말해줄 수 있어?"}
+{"id": "ib05", "boundary": "in", "topic": "elder_scroll", "prompt_ko": "네가 지니고 있던 그 엘더스크롤은 뭐야?"}
+{"id": "ib06", "boundary": "in", "topic": "dimhollow", "prompt_ko": "딤할로우 크립트에는 왜 갇혀 있었던 거야?"}
+{"id": "ib07", "boundary": "in", "topic": "volkihar_dawnguard", "prompt_ko": "볼키하르랑 던가드, 너는 어느 쪽에 더 가까워?"}
+{"id": "ib08", "boundary": "in", "topic": "necromancy", "prompt_ko": "네크로맨시는 어디서 배운 거야?"}
+{"id": "ib09", "boundary": "in", "topic": "age", "prompt_ko": "너 대체 몇 살이야?"}
+{"id": "ib10", "boundary": "in", "topic": "vampirism_daily", "prompt_ko": "낮에 햇빛 아래 돌아다니는 거, 너한테 괜찮은 거야?"}
+{"id": "ib11", "boundary": "in", "topic": "fear", "prompt_ko": "너도 무서워하는 게 있어?"}
+{"id": "ib12", "boundary": "in", "topic": "social", "prompt_ko": "사람들이랑 잘 지내는 편이야?"}
+{"id": "ib13", "boundary": "in", "topic": "skyrim_world", "prompt_ko": "스카이림의 겨울은 마음에 들어?"}
+{"id": "ib14", "boundary": "in", "topic": "magic_preference", "prompt_ko": "네가 제일 좋아하는 마법이 뭐야?"}
+{"id": "ib15", "boundary": "in", "topic": "personality", "prompt_ko": "너는 왜 그렇게 방어적이야?"}
+{"id": "ib16", "boundary": "in", "topic": "freedom", "prompt_ko": "그렇게 오래 갇혀 있다가 다시 자유로워진 기분이 어때?"}
+{"id": "ib17", "boundary": "in", "topic": "trust", "prompt_ko": "너는 나를 진짜로 믿어?"}
+{"id": "ib18", "boundary": "in", "topic": "companionship", "prompt_ko": "나랑 같이 다니는 거, 후회한 적 없어?"}
+{"id": "oob01", "boundary": "out", "topic": "technology", "prompt_ko": "스마트폰 써본 적 있어?"}
+{"id": "oob02", "boundary": "out", "topic": "modern_media", "prompt_ko": "요즘 제일 인기 있는 노래가 뭔지 알아?"}
+{"id": "oob03", "boundary": "out", "topic": "technology", "prompt_ko": "인터넷이 뭔지 알아?"}
+{"id": "oob04", "boundary": "out", "topic": "modern_life", "prompt_ko": "커피 마셔본 적 있어?"}
+{"id": "oob05", "boundary": "out", "topic": "modern_world", "prompt_ko": "지금 이 나라를 다스리는 대통령이 누군지 알아?"}
+{"id": "oob06", "boundary": "out", "topic": "technology", "prompt_ko": "자동차라는 걸 타본 적 있어?"}
+{"id": "oob07", "boundary": "out", "topic": "modern_life", "prompt_ko": "영화관에 가본 적 있어?"}
+{"id": "oob08", "boundary": "out", "topic": "modern_life", "prompt_ko": "요즘 사람들은 서로 어떻게 연락하고 지내?"}
+{"id": "oob09", "boundary": "out", "topic": "technology", "prompt_ko": "비행기라는 걸 타본 적 있어?"}
+{"id": "oob10", "boundary": "out", "topic": "modern_life", "prompt_ko": "요즘 유행하는 옷차림은 어떤 것 같아?"}
+{"id": "oob11", "boundary": "out", "topic": "technology", "prompt_ko": "SNS라는 거 해본 적 있어?"}
+{"id": "oob12", "boundary": "out", "topic": "modern_world", "prompt_ko": "지금이 정확히 몇 년도인지 알아?"}

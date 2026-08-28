@@ -1,0 +1,10 @@
+{
+  "label": "serving KV-cache (max_model_len=4096, max_num_seqs=8, bf16)",
+  "predicted_vram_gb": "4.50 GB (worst-case, all 8 seqs @ 4096 tok)",
+  "measured_vram_gb": "3.17 GB default alloc / 4.87 GB to fully utilize (vLLM's own report)",
+  "step_time_or_ttft": "-",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "-",
+  "cost_usd": "-"
+}

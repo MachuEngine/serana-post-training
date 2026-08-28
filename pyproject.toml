@@ -1,0 +1,61 @@
+[project]
+name = "serana-post-training"
+version = "0.1.0"
+description = "Post-training stack (prompt -> CPT -> SFT -> DPO) for persona consistency, on one 24GB GPU. Portfolio project, non-commercial."
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.14.0",
+    "fastapi>=0.120.0",
+    "openai>=3.3.1",
+    "peft>=0.20.0",
+    "python-dotenv>=1.2.3",
+    "pyyaml>=6.0.3",
+    "torch>=2.13.0",
+    "transformers>=5.15.1",
+    "trl>=1.10.0",
+    "uvicorn>=0.38.0",
+    "vllm>=0.11.0; sys_platform == 'linux'",
+]
+
+# torch/transformers/peft/trl/accelerate added in P1 for the §3.6b local
+# failure sandbox on the M5 (src/finetune/train.py runs on CPU/MPS there,
+# CUDA-only knobs like 4-bit quant/FlashAttention-2/paged_adamw_8bit are
+# downgraded automatically when no CUDA device is present -- bitsandbytes
+# is deliberately NOT a dependency for that reason, it only matters on the
+# real L4 and isn't installable in a useful way on the M5 anyway).
+# vllm/fastapi/uvicorn added in P5 for the real serving path
+# (src/serve/pipeline.py). vllm is marked `sys_platform == 'linux'` --
+# its dependency tree pulls in NVIDIA CUDA packages with no macOS wheels
+# at all, so an unconditional entry broke `uv sync`/`uv run` on the M5
+# outright (found the hard way, fixed immediately: CLAUDE.md requires
+# the local sandbox keep working). fastapi/uvicorn are pure Python and
+# fine everywhere; only vllm needed the marker.
+# bitsandbytes still deliberately not added -- P2/P4's training path
+# installed it directly on the VM (see p2_progress.md's environment-bugs
+# section) rather than through this file, since it isn't usable on the
+# M5 sandbox at all. gradio still deferred to P6.
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# These files embed PROMPTS.md prompt text verbatim (translate_corpus/
+# translate_dialogue §2a/§2b, persona_system §1) -- reflowing long lines
+# to satisfy E501 would make the copy diverge from the source of truth
+# PROMPTS.md declares itself to be. Long lines here are the point.
+"src/data/translate.py" = ["E501"]
+"src/finetune/train.py" = ["E501"]
+"src/eval/judge_boundary.py" = ["E501"]
+"src/eval/judge_robustness.py" = ["E501"]
+"src/eval/judge_pcs.py" = ["E501"]
+"src/eval/preference_judge.py" = ["E501"]
+"src/serve/pipeline.py" = ["E501"]
