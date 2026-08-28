@@ -292,3 +292,29 @@ wiki/fan content during pretraining. This means B's baseline for *this
 specific, well-known persona* may be stronger than it would be for an
 obscure/original character -- worth stating plainly in the eventual
 writeup rather than assuming B is a "blank slate" baseline.
+
+## P2: done
+
+All CLAUDE.md/DESIGN.md build-order criteria for P2 are met: CPT and
+SFT adapters trained within budget on the real L4 · lr chosen from the
+§3.6c probe (2e-4), both rejected curves (2e-5 underfits, 2e-3 spikes)
+kept · §3.6d rank comparison recorded, r=16 kept over r=64 with reasons
+stated · train/val loss logged for both stages · predicted-vs-measured
+peak VRAM recorded, including the real 6-12x wall-clock miss on SFT
+(root-caused live: `grad_accum_steps` override bug) · §7.2 knob
+ablation (checkpointing on/off) and flash-attn-vs-sdpa comparison both
+done, with the counter-intuitive flash-attn finding (bought nothing --
+dequantization, not attention, is the real bottleneck) stated plainly
+rather than assumed away · `torch.profiler` trace + MFU (13.5%) with a
+written explanation, cross-validated against real training step times
+· one simulated preemption/resume cycle verified working · in-persona
+Korean smoke test done, with an honest read that includes the one
+regression (Q3) alongside the two real gains, not just "SFT wins".
+
+Two real bugs found and fixed along the way: `save_strategy="no"`
+(would have lost a Spot-preempted run entirely) and a missing
+`max_steps` in `rank_probe.yaml` (would have run full training instead
+of a short probe). Both caught before they cost anything.
+
+Next is P3 (RLAIF preference data) -- needs the `serana-sft` adapter
+this stage produced.

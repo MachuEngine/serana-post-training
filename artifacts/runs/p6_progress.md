@@ -76,7 +76,7 @@ both `machu8/serana-sft` and `machu8/serana-dpo`;
 - https://huggingface.co/machu8/serana-sft
 - https://huggingface.co/machu8/serana-dpo
 
-## Stage 4 -- Gradio demo (`demo/app.py`): code done, not yet deployed
+## Stage 4 -- Gradio demo (`demo/app.py`): code done, deploy skipped (see Stage 6)
 
 Design: ZeroGPU Space, plain `transformers`+`peft` (not vLLM/AWQ) --
 mirrors `scripts/smoke_test.py`'s already-proven pattern rather than
@@ -106,25 +106,8 @@ real generation locally -- no GPU here, and `spaces` only works inside
 an actual Space): ruff clean; config loading + system-prompt
 construction produces the exact same string as
 `scripts/smoke_test.py`'s already-proven version (tested in isolation).
-Real end-to-end verification happens in Stage 6 after deployment.
-
-## Stage 6 -- deploy to HF Spaces: skipped (real blocker, not a bug)
-
-`api.create_repo(repo_type="space", space_hardware="zero-a10g")` failed
-with a real, informative `402 Payment Required`: ZeroGPU Spaces require
-either a HF PRO subscription or a community grant (new accounts wait
-~30 days before they're eligible to apply). Not something to route
-around silently.
-
-Talked through it with the user: a Spaces demo only serves other
-people trying it without setup -- it adds no capability neither of us
-already has (repo + HF Hub adapters + results tables already make the
-work fully inspectable and runnable). Decided: skip the paid/wait path
-for now. `demo/app.py`/`demo/requirements.txt` stay in the repo as-is
-(genuinely useful, runs on any CUDA machine), README's "Live demo"
-link replaced with "run it yourself" instructions. Revisit if a real
-need for a zero-setup demo comes up later (e.g. showing it to someone
-directly).
+Real end-to-end verification is deferred along with Stage 6 (not
+deployed -- see below), not done yet.
 
 ## Stage 5 -- README: done
 
@@ -143,3 +126,37 @@ note not to conflate them). Circularity guard explained in prose, not
 just cited. Hardware section keeps the "more KV-cache headroom, not
 less VRAM used" precision from `p5_progress.md` rather than the flatter,
 less accurate claim.
+
+## Stage 6 -- deploy to HF Spaces: skipped (real blocker, not a bug)
+
+`api.create_repo(repo_type="space", space_hardware="zero-a10g")` failed
+with a real, informative `402 Payment Required`: ZeroGPU Spaces require
+either a HF PRO subscription or a community grant (new accounts wait
+~30 days before they're eligible to apply). Not something to route
+around silently.
+
+Talked through it with the user: a Spaces demo only serves other
+people trying it without setup -- it adds no capability neither of us
+already has (repo + HF Hub adapters + results tables already make the
+work fully inspectable and runnable). Decided: skip the paid/wait path
+for now. `demo/app.py`/`demo/requirements.txt` stay in the repo as-is
+(genuinely useful, runs on any CUDA machine), README's "Live demo"
+link replaced with "run it yourself" instructions. Revisit if a real
+need for a zero-setup demo comes up later (e.g. showing it to someone
+directly) -- resume point: create the Space repo (command above works
+mechanically, it's the hardware tier that's gated), push `demo/`, then
+do the real end-to-end verification Stage 4 deferred.
+
+## P6: done
+
+All CLAUDE.md/DESIGN.md P6 done-criteria met, with one explicit,
+discussed exception: the entire project is on GitHub `main` (a real
+gap found and fixed at the start of this phase -- P1-P5's work had
+never actually been pushed), both LoRA adapters are on HF Hub with
+real model cards, and the README states both results tables plus the
+headline finding in prose. The literal "a stranger can open the demo"
+criterion is **not met** -- deploy is deliberately deferred (Stage 6),
+a discussed tradeoff rather than an oversight: a stranger *can* already
+inspect and reproduce everything from the repo + HF Hub adapters on
+one 24GB GPU, which is the substance of the criterion even without a
+zero-setup web demo.
