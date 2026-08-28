@@ -1,0 +1,10 @@
+{
+  "label": "SFT (training, L4, spot, r=16, lr=2e-4)",
+  "predicted_vram_gb": "-",
+  "measured_vram_gb": "9.64 GB",
+  "step_time_or_ttft": "wall clock: predicted 20-40min, measured 4h12m (grad_accum_steps override bug)",
+  "gpu_util_pct": "-",
+  "mfu_pct": "13.5%",
+  "throughput": "-",
+  "cost_usd": "~$5 (incl. reruns/diagnostics)"
+}

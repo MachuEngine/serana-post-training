@@ -1,0 +1,10 @@
+{
+  "label": "DPO (training, L4, resumed after 1 preemption)",
+  "predicted_vram_gb": "13-16 GB",
+  "measured_vram_gb": "~15 GB (nvidia-smi)",
+  "step_time_or_ttft": "predicted 34-38s/step, measured ~26-27s/step",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "-",
+  "cost_usd": "predicted ~$0.30-0.35, measured ~$0.25"
+}

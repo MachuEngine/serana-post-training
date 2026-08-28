@@ -1,0 +1,9 @@
+# HF Spaces installs from this file directly -- not uv/pyproject.toml
+# (see pyproject.toml's own comment on why: Spaces manages its own
+# CUDA-compatible torch build for ZeroGPU).
+gradio>=5.0.0
+spaces
+torch
+transformers>=5.15.1
+peft>=0.20.0
+pyyaml>=6.0.3

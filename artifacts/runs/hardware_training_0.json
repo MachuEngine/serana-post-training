@@ -1,0 +1,10 @@
+{
+  "label": "CPT (training, L4, spot)",
+  "predicted_vram_gb": "-",
+  "measured_vram_gb": "9.64 GB",
+  "step_time_or_ttft": "36.2s wall clock (tiny corpus, 3 steps)",
+  "gpu_util_pct": "-",
+  "mfu_pct": "-",
+  "throughput": "-",
+  "cost_usd": "~$0 (few sec)"
+}

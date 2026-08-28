@@ -6,6 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.14.0",
     "fastapi>=0.120.0",
+    "gradio>=5.0.0",
+    "huggingface-hub>=0.26.0",
     "openai>=3.3.1",
     "peft>=0.20.0",
     "python-dotenv>=1.2.3",
@@ -30,6 +32,9 @@ dependencies = [
 # outright (found the hard way, fixed immediately: CLAUDE.md requires
 # the local sandbox keep working). fastapi/uvicorn are pure Python and
 # fine everywhere; only vllm needed the marker.
+# gradio/huggingface-hub added in P6: gradio for demo/app.py, huggingface-hub
+# for scripts/upload_to_hub.py (was already available transitively via
+# transformers, but P6 code imports it directly so it gets its own entry).
 # bitsandbytes still deliberately not added -- P2/P4's training path
 # installed it directly on the VM (see p2_progress.md's environment-bugs
 # section) rather than through this file, since it isn't usable on the
@@ -59,3 +64,4 @@ select = ["E", "F", "I", "UP"]
 "src/eval/judge_pcs.py" = ["E501"]
 "src/eval/preference_judge.py" = ["E501"]
 "src/serve/pipeline.py" = ["E501"]
+"demo/app.py" = ["E501"]
