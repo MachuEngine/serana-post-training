@@ -103,9 +103,9 @@ Player: {player_line}
 
 ---
 
-## 3. SFT dialogue generation — id `synth_dialogue` — v1 `[draft]`
+## 3. SFT dialogue generation — id `synth_dialogue` — v1 `[ready]`
 
-Generates the synthetic portion of the SFT set. **Inputs are the already-Korean translated lines (§2).**
+Generates the synthetic portion of the SFT set. **Inputs are the already-Korean translated lines (§2).** Bumped from `[draft]` to `[ready]` after P1: generated exactly 2,766 synthetic pairs matching the computed targets (2,074 ordinary / 415 hard-case / 277 oob) with no quality issues found -- `artifacts/runs/p1_progress.md`.
 
 **How many to generate depends on P1's ingest count.** The SFT set targets ~3k pairs total, composed of however many genuine pairs survived from the wiki (§2b) plus synthetic exchanges to fill the rest. `{n}` is computed at runtime as `3000 − n_real_pairs`, not hardcoded — and the resulting ratio goes in the README (DESIGN.md §3.1), because it quantifies how much of the pipeline is LLM-authored.
 
@@ -189,9 +189,9 @@ Output JSON only:
 
 ---
 
-## 5. LLM-as-Judge — persona consistency — id `judge_pcs` — v2 `[draft]`
+## 5. LLM-as-Judge — persona consistency — id `judge_pcs` — v2 `[ready]`
 
-**v2 change note:** same fix as §4 v2 — added `{voice_notes}` and `{speech_level}` (was `{persona_profile}` only, so the judge had no explicit register rule to check a reply against). Found via the §4 audit, not a §5-specific test; **the v1→v2 bump invalidates the P1 §4.4 human-label validation run under v1** — re-run it before trusting any judge_pcs-backed number (P5), per this file's own rule (line 9). Status left `[draft]` until that re-validation passes.
+**v2 change note:** same fix as §4 v2 — added `{voice_notes}` and `{speech_level}` (was `{persona_profile}` only, so the judge had no explicit register rule to check a reply against). Found via the §4 audit, not a §5-specific test; **the v1→v2 bump invalidated the P1 §4.4 human-label validation run under v1** — re-run in P5 (`src/eval/validate_judge.py`), Spearman **0.7338** against the 0.6 floor, passes. Bumped to `[ready]` on that result — `data/eval/eval_set_v1/judge_validation_report.json`.
 
 Scores a reply against the persona setting (PCS soft-trait check; validated per DESIGN.md §4.4). Measurement loop.
 
@@ -304,9 +304,11 @@ Output JSON only:
 
 ---
 
-## 8. Knowledge-boundary judge — id `judge_boundary` — v1 `[ready]`
+## 8. Knowledge-boundary judge — id `judge_boundary` — v1 `[draft]`
 
 For knowledge-boundary accuracy: given a prompt labeled in- or out-of-boundary, decide whether the reply correctly answered, correctly deflected, or leaked impossible knowledge. Measurement-loop prompt — never reused to train against, same circularity guard as §5/§7.
+
+Marked `[draft]` on the same basis as §7, not `[ready]` (an earlier version of this file inconsistently marked the two differently despite an identical situation) — not validated against a human-labeled set (no boundary-labeled equivalent to the 50-item §5 set exists; confirmed with the user in P5 that this stays unvalidated rather than spinning up a new hand-labeling round for one judge). Used successfully in the real P5 eval pass regardless -- `[draft]` here tracks "not human-validated," not "broken."
 
 Handles the asymmetry noted when this was `[todo]`: an out-of-boundary *deflection* is easy to score, but an in-boundary *answer* must also be checked against the curated self-knowledge set (DESIGN.md §3.1) — a confidently wrong in-character answer about her own mother is a boundary failure, not a success. `{self_knowledge}` is passed in for exactly that check; a reply can stay perfectly in *voice* and still be a boundary failure if it's in-boundary but factually inconsistent with it.
 

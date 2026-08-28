@@ -4,6 +4,7 @@ pairs, emit the final (prompt, chosen, rejected) preference set.
 
 Runs off the GPU VM -- API-only (CLAUDE.md cost discipline).
 """
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,6 @@ import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
-from pathlib import Path
 
 from openai import RateLimitError
 
@@ -79,8 +79,12 @@ def main() -> None:
             else:
                 n_error += 1
             continue
-        chosen, rejected = (it["reply_a"], it["reply_b"]) if choice == "A" else (it["reply_b"], it["reply_a"])
-        preferences.append({"prompt": it["prompt"], "chosen": chosen, "rejected": rejected, "reason": j["reason"]})
+        chosen, rejected = (
+            (it["reply_a"], it["reply_b"]) if choice == "A" else (it["reply_b"], it["reply_a"])
+        )
+        preferences.append(
+            {"prompt": it["prompt"], "chosen": chosen, "rejected": rejected, "reason": j["reason"]}
+        )
 
     with open("data/ko/prefs_1k.jsonl", "w") as f:
         for p in preferences:

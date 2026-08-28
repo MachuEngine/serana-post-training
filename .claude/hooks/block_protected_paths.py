@@ -13,6 +13,7 @@ Read is still allowed (needed to diagnose eval/leakage issues). Only
 writes are blocked. Generate these paths via scripts/ (Bash), not by
 writing the files directly.
 """
+
 import json
 import os
 import sys

@@ -24,7 +24,7 @@ No retrieval step — deliberate, so measured deltas are attributable to trainin
 - `src/finetune/` — CPT, SFT, and DPO training. Outputs adapter weights.
 - `src/serve/` — vLLM + FastAPI; owns the inference path.
 - `src/eval/` — quality metrics + judges.
-- `src/gpu/` — VRAM estimation, profiling helpers, `nvidia-smi` logging, MFU calculation. Imported by training and serving; owns no pipeline logic.
+- `src/gpu/` — reserved in the original layout for VRAM estimation, profiling helpers, `nvidia-smi` logging, MFU calculation. In practice all of that instrumentation ended up as standalone `scripts/` (`gpu_probe.py`, `profile_train.py`, `kv_cache_estimate.py`) rather than an importable module -- each script is a one-shot measurement run, not logic reused across training/serving, so a shared module never earned its keep. `src/gpu/__init__.py` is an empty stub. Noted here rather than silently left to drift, same as `src/finetune/`'s consolidation below.
 
 One genuine coupling: preference-pair generation (`src/data/`) samples from the SFT adapter, so it depends on a generation call. Reuse `src/serve/`'s generation function rather than writing a second inference path — a divergence would mean the preference pairs came from a different model than the one evaluated.
 
@@ -411,7 +411,7 @@ paths:
 │   ├── finetune/             # train.py -- one entry point, train.method (cpt|sft|dpo) dispatches; extends the §1 single-pipeline rule to training instead of three near-duplicate scripts (device-aware model/LoRA loading, val split, run-report are identical across all three methods)
 │   ├── serve/                # vLLM + FastAPI (the run(config) path)
 │   ├── eval/                 # quality metrics, judges, results tables
-│   └── gpu/                  # vram_estimate.py, profile.py, smi_logger.py, mfu.py
+│   └── gpu/                  # empty in practice -- see §2, this instrumentation lives in scripts/ instead
 ├── scripts/                  # one-command runners (incl. gpu_probe.py, GCE up/down)
 ├── artifacts/
 │   ├── lora/                 # shipped adapters

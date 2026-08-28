@@ -14,6 +14,7 @@ Output is split in two so the audit stays blind:
     be read before filling in audit_sample.jsonl -- it's the answer key
     for the agreement check afterward.
 """
+
 from __future__ import annotations
 
 import json
@@ -57,7 +58,7 @@ def main() -> None:
     )
 
     print(f"wrote {len(audit_items)} blind audit items to data/ko/audit_sample.jsonl")
-    print("fill in human_choice (\"A\" / \"B\" / \"tie\") for each item by hand, then")
+    print('fill in human_choice ("A" / "B" / "tie") for each item by hand, then')
     print("compare against artifacts/runs/p3_audit_key.json (don't peek first).")
 
 

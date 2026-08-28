@@ -7,6 +7,7 @@ Does NOT touch human_choice (already filled in) or the original
 p3_audit_key.json (v1 judge_choice) -- writes a separate v2 key so both
 are comparable side by side.
 """
+
 from __future__ import annotations
 
 import json
@@ -33,8 +34,18 @@ def main() -> None:
     n_comparable = len(items) - n_tie
     agreement = n_agree / n_comparable if n_comparable else float("nan")
 
-    print(json.dumps({"n": len(items), "n_judge_tie": n_tie, "n_comparable": n_comparable,
-                       "n_agree": n_agree, "agreement_rate": round(agreement, 4)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "n": len(items),
+                "n_judge_tie": n_tie,
+                "n_comparable": n_comparable,
+                "n_agree": n_agree,
+                "agreement_rate": round(agreement, 4),
+            },
+            indent=2,
+        )
+    )
 
     with open("artifacts/runs/p3_audit_key_v2.json", "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)

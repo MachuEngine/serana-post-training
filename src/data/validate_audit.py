@@ -4,6 +4,7 @@ data/ko/audit_sample.jsonl against artifacts/runs/p3_audit_key.json
 after human_choice is filled in for every item -- not before, or the
 audit isn't blind.
 """
+
 from __future__ import annotations
 
 import json

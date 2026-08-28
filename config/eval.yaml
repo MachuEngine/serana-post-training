@@ -2,10 +2,12 @@
 # §5.1 layout).
 eval_set_version: v1   # frozen -- eval_prompts.jsonl (30), attack_probes.jsonl (24),
                         # style_reference.jsonl (33), human_labels.jsonl (50, scored,
-                        # judge-validated at Spearman 0.792) all reviewed and confirmed
-                        # by the user in data/eval/eval_set_v1/. Leakage check passes
-                        # (src/data/check_leakage.py). Do not edit these files after
-                        # this point without bumping the version.
+                        # judge-validated at Spearman 0.7338 as of the P5 v2-prompt
+                        # re-validation -- see data/eval/eval_set_v1/judge_validation_report.json,
+                        # the number here goes stale again if that's re-run) all
+                        # reviewed and confirmed by the user in data/eval/eval_set_v1/.
+                        # Leakage check passes (src/data/check_leakage.py). Do not edit
+                        # these files after this point without bumping the version.
 
 judge:
   # DESIGN.md §9.4: GPT-4o (OpenAI), decided. Judge validation against the
@@ -16,5 +18,9 @@ judge:
   correlation_floor: 0.6   # DESIGN.md §4.4: "If Spearman < ~0.6, revise the judge prompt before trusting any judge-backed number"
 
 thresholds:
-  ttft_p95_ms: null            # TODO(P5): serving latency target
+  ttft_p95_ms: 422             # measured P5 baseline at max_num_seqs=8 (base.yaml's
+                                # configured value), the knee of the throughput/concurrency
+                                # sweep -- artifacts/runs/results_hardware.md. Not a
+                                # pre-registered target (none was set before P5 ran); a
+                                # regression baseline for future serving changes to compare against.
   vram_tolerance: 0.20         # mirrors train.gpu.vram_estimate_tolerance in base.yaml

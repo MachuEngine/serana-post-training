@@ -11,6 +11,7 @@ explicitly. A command relying on a pre-set `gcloud config` default region
 won't be caught here -- this hook narrows the risk, it doesn't guarantee
 it. Verify `gcloud config get-value compute/region` separately.
 """
+
 import json
 import re
 import sys

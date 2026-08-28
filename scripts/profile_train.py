@@ -15,6 +15,7 @@ a conservative (slight under-) estimate of actual efficiency, not exact.
 L4 peak BF16 (dense, no structural sparsity -- QLoRA training doesn't use
 sparsity acceleration): 121 TFLOPS, from NVIDIA's L4 datasheet.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,11 +43,20 @@ MICRO_BATCHES = 6
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--no-grad-checkpoint", action="store_true",
-                         help="disable gradient checkpointing, for the §7.2 ablation comparison")
-    parser.add_argument("--tag", default="default", help="label for this run in the saved report filename")
-    parser.add_argument("--attn", default="sdpa", choices=["sdpa", "flash_attention_2"],
-                         help="attention implementation, for the §7.2 ablation comparison")
+    parser.add_argument(
+        "--no-grad-checkpoint",
+        action="store_true",
+        help="disable gradient checkpointing, for the §7.2 ablation comparison",
+    )
+    parser.add_argument(
+        "--tag", default="default", help="label for this run in the saved report filename"
+    )
+    parser.add_argument(
+        "--attn",
+        default="sdpa",
+        choices=["sdpa", "flash_attention_2"],
+        help="attention implementation, for the §7.2 ablation comparison",
+    )
     args = parser.parse_args()
     grad_checkpoint = not args.no_grad_checkpoint
 
@@ -56,18 +66,25 @@ def main() -> None:
         tokenizer.pad_token = tokenizer.eos_token
 
     bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True, bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16,
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
     )
     model = AutoModelForCausalLM.from_pretrained(
-        BASE_ID, quantization_config=bnb_config, attn_implementation=args.attn,
+        BASE_ID,
+        quantization_config=bnb_config,
+        attn_implementation=args.attn,
         dtype=torch.bfloat16,
     )
     if grad_checkpoint:
         model.gradient_checkpointing_enable()
     lora_config = LoraConfig(
-        r=16, lora_alpha=32, lora_dropout=0.05,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"], task_type="CAUSAL_LM",
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, lora_config)
     model.train()
@@ -104,7 +121,9 @@ def main() -> None:
     start = time.time()
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        record_shapes=False, profile_memory=False, with_stack=False,
+        record_shapes=False,
+        profile_memory=False,
+        with_stack=False,
     ) as prof:
         for _ in range(MICRO_BATCHES):
             run_micro_batch()
@@ -118,7 +137,9 @@ def main() -> None:
 
     total_tokens = batch_size * seq_len * MICRO_BATCHES
     micro_batch_time_s = wall_s / MICRO_BATCHES
-    step_time_s_at_grad_accum_16 = micro_batch_time_s * 16  # for comparison with real training's logged step time
+    step_time_s_at_grad_accum_16 = (
+        micro_batch_time_s * 16
+    )  # for comparison with real training's logged step time
 
     flops_per_token = 6 * n_params_total  # standard full-FT approximation, see module docstring
     achieved_flops_per_s = flops_per_token * total_tokens / wall_s
@@ -141,8 +162,8 @@ def main() -> None:
         "l4_peak_bf16_tflops_dense": L4_PEAK_BF16_TFLOPS,
         "mfu": round(mfu, 4),
         "mfu_caveat": "6N formula assumes full fine-tuning backward cost; LoRA's frozen "
-                       "base weights need less backward compute than that, so this MFU "
-                       "is a conservative (understated) estimate, not exact.",
+        "base weights need less backward compute than that, so this MFU "
+        "is a conservative (understated) estimate, not exact.",
     }
     print(json.dumps(report, indent=2))
     with open(f"artifacts/diagnostics/mfu_report_{args.tag}.json", "w") as f:
