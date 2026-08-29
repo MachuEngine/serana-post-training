@@ -54,9 +54,9 @@ Full trail: `artifacts/runs/p4_progress.md` and `p5_progress.md`.
 
 ## Results — Quality
 
-Base model `Qwen/Qwen3-8B` · bf16 · 1× NVIDIA L4 24GB, `asia-northeast3` (Seoul)
-driver 580.173.02, CUDA 12.9 (training) / CUDA 13.0 (serving, via a later `vllm` install)
-30 in/out-of-boundary prompts + 24 attack probes · greedy decoding · 95% bootstrap CI (≥1000 resamples)
+- **Model:** `Qwen/Qwen3-8B` · bf16 · 1× NVIDIA L4 24GB, `asia-northeast3` (Seoul)
+- **Driver / CUDA:** 580.173.02, CUDA 12.9 (training) / CUDA 13.0 (serving, via a later `vllm` install)
+- **Eval setup:** 30 in/out-of-boundary prompts + 24 attack probes · greedy decoding · 95% bootstrap CI (≥1000 resamples)
 
 | config | PCS | PRS | style sim | knowledge-boundary acc | mean reply length | distinct-2 |
 |---|---|---|---|---|---|---|

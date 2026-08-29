@@ -54,9 +54,9 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, d
 
 ## 결과 — 품질
 
-Base 모델 `Qwen/Qwen3-8B` · bf16 · NVIDIA L4 24GB 1장, `asia-northeast3`(서울)
-driver 580.173.02, CUDA 12.9(학습) / CUDA 13.0(서빙, 이후 `vllm` 설치로 버전이 올라감)
-in/out-of-boundary 프롬프트 30개 + attack probe 24개 · greedy decoding · 95% bootstrap CI(≥1000 resamples)
+- **모델:** `Qwen/Qwen3-8B` · bf16 · NVIDIA L4 24GB 1장, `asia-northeast3`(서울)
+- **Driver / CUDA:** 580.173.02, CUDA 12.9(학습) / CUDA 13.0(서빙, 이후 `vllm` 설치로 버전이 올라감)
+- **Eval 설정:** in/out-of-boundary 프롬프트 30개 + attack probe 24개 · greedy decoding · 95% bootstrap CI(≥1000 resamples)
 
 | config | PCS | PRS | style sim | knowledge-boundary acc | 평균 응답 길이 | distinct-2 |
 |---|---|---|---|---|---|---|
