@@ -13,11 +13,7 @@ General-purpose chatbot models (like ChatGPT) are trained to be helpful assistan
 
 This project trains and measures — with real numbers, not a demo video — how much better a model gets at holding a character through a sequence of training techniques, and does the entire thing on **one consumer-accessible GPU** (an NVIDIA L4, 24GB — modest next to the hardware that trains models like GPT).
 
-**The test character is Serana**, an NPC (non-player character) from the video game *The Elder Scrolls V: Skyrim* (its *Dawnguard* expansion). She wasn't picked at random:
-
-- She's a ~4,000-year-old vampire who spent centuries sealed away asleep — so it's natural, in-universe, for her to know nothing about recent events or the modern world. That gives a clean, testable line: does the model correctly play dumb about things Serana shouldn't know, instead of confidently making something up?
-- She has a large body of official, already-written dialogue (from the game and fan wikis) — real example text to learn her voice from, not something invented from scratch.
-- She has a distinct, well-documented personality (dry, guarded, quietly caring once she trusts someone) that's easy to check a model's output against.
+**The test character is Serana**, an NPC from the video game *The Elder Scrolls V: Skyrim*, picked for three engineering reasons: an in-universe excuse to know nothing about the modern world (a clean, testable knowledge boundary), a large body of existing dialogue to actually train on, and a well-defined personality to check model output against.
 
 **Two questions, with numbers:**
 
