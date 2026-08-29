@@ -114,7 +114,7 @@ Full predicted-vs-measured trail for every GPU phase, including two real environ
 
 ## Stack
 
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI-compatible server, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` on HF Spaces (ZeroGPU) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI-compatible server, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
 
 PPO/reward-model RLHF is deliberately excluded: the VRAM arithmetic for policy + reference + reward + value simultaneously resident doesn't fit 8B on 24GB (`DESIGN.md` §7.1). That calculation is itself part of the deliverable.
 

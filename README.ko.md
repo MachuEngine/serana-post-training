@@ -114,7 +114,7 @@ LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7
 
 ## 스택
 
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI 호환 서버, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · HF Spaces용 `Gradio` (ZeroGPU) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI 호환 서버, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
 
 PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올려야 하는 VRAM 계산이 8B 모델을 24GB에 못 태운다(`DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다.
 
