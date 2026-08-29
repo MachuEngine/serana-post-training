@@ -108,7 +108,7 @@ LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7
 
 - 수집된 위키 대화 라인(UESP + Fandom, CC BY-SA) 중 **51.4%**가 실제 `(플레이어 대사, 응답)` 쌍으로 남았다. 나머지는 독립 발화(CPT corpus)이거나 horizon filter로 제외됐다(4E 201 이후 / 현대 세계 관련 내용 없음).
 - 최종 ~3천 개 SFT set은 **real pair 7.7%, synthetic 92.3%**(GPT-4o로 생성, 실제 데이터 톤에 맞춤)다. 이 비율은 단순 기록 이상의 의미가 있다. 파이프라인이 처음부터 끝까지(SFT 데이터 → DPO preference label → eval 채점) LLM이 만든 비중이 클수록 아래 circularity 우려가 더 커진다.
-- **Circularity guard:** preference judge(쌍대비교, DPO를 학습시킴)와 eval judge(절대평가, 결과를 채점함)는 의도적으로 서로 다른 prompt·rubric을 쓴다(`PROMPTS.md` §4 vs §5). 각각 사람이 직접 채점한 50개 라벨 대비 검증했다(Spearman 0.73, 기준선 0.6). DPO의 개선이 있다면 judge가 아닌 신호(PRS regex check, style similarity, human label)에서도 나타나야 신뢰할 수 있는데, 애초에 DPO가 개선을 보이지 않았으니 이 문제 자체가 발생하지 않았다.
+- **Circularity guard:** preference judge(쌍대비교, DPO를 학습시킴)와 eval judge(절대평가, 결과를 채점함)는 의도적으로 서로 다른 prompt·rubric을 쓴다(`PROMPTS.md` §4 vs §5). 검증 방법도 각각 다르다: eval judge는 사람이 직접 채점한 50개 라벨 대비 Spearman 0.7338(기준선 0.6)로 검증했고, preference judge는 별도로 30쌍 hand-audit에서 사람과 73.1% 일치(기준선 70%)로 검증했다. DPO의 개선이 있다면 judge가 아닌 신호(PRS regex check, style similarity, human label)에서도 나타나야 신뢰할 수 있는데, 애초에 DPO가 개선을 보이지 않았으니 이 문제 자체가 발생하지 않았다.
 
 ---
 

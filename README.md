@@ -108,7 +108,7 @@ Full predicted-vs-measured trail for every GPU phase, including two real environ
 
 - **51.4%** of ingested wiki dialogue lines (UESP + Fandom, CC BY-SA) survived as genuine `(player line, reply)` pairs. The rest are standalone utterances (CPT corpus) or excluded by the horizon filter (nothing after 4E 201 / modern-world topics).
 - The final ~3k SFT set is **7.7% real pairs, 92.3% synthetic** (GPT-4o-generated, matched to the real data's voice). This ratio matters beyond bookkeeping: the more of the pipeline is LLM-authored end to end (SFT data → DPO preference labels → eval scoring), the sharper the circularity concern below.
-- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately against 50 hand-scored human labels (Spearman 0.73, floor 0.6). Any DPO gain would need to show up in a non-judge signal (the PRS regex check, style similarity, or the human labels) to be trusted. Moot here, since DPO didn't show a gain to begin with.
+- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately, by a different method. The eval judge is checked against 50 hand-scored human labels (Spearman 0.7338, floor 0.6); the preference judge is checked via a 30-pair hand-audit (73.1% agreement with a human, floor 70%). Any DPO gain would need to show up in a non-judge signal (the PRS regex check, style similarity, or the human labels) to be trusted. Moot here, since DPO didn't show a gain to begin with.
 
 ---
 
