@@ -11,7 +11,7 @@ English | [한국어](README.ko.md)
 
 General-purpose chatbot models (like ChatGPT) are trained to be helpful assistants — which also makes them bad at *staying* a specific character. Ask one to roleplay for long enough and it slips: it answers something the character couldn't possibly know, or admits "I'm just an AI" the moment a user pushes.
 
-This project trains and measures — with real numbers, not a demo video — how much better a model gets at holding a character through a sequence of training techniques, and does the entire thing on **one consumer-accessible GPU** (an NVIDIA L4, 24GB — modest next to the hardware that trains models like GPT).
+This project trains and measures — with real numbers, not a demo video — how much better a model gets at holding a character through a sequence of training techniques.
 
 **The test character is Serana**, an NPC from the video game *The Elder Scrolls V: Skyrim*, picked for three engineering reasons: an in-universe excuse to know nothing about the modern world (a clean, testable knowledge boundary), a large body of existing dialogue to actually train on, and a well-defined personality to check model output against.
 
