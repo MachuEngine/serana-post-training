@@ -9,28 +9,28 @@ English | [한국어](README.ko.md)
 
 ## What this project is
 
-General-purpose chatbot models (like ChatGPT) are trained to be helpful assistants — which also makes them bad at *staying* a specific character. Ask one to roleplay for long enough and it slips: it answers something the character couldn't possibly know, or admits "I'm just an AI" the moment a user pushes.
+General-purpose chatbot models (like ChatGPT) are trained to be helpful assistants, which also makes them bad at *staying* a specific character. Ask one to roleplay for long enough and it slips: it answers something the character couldn't possibly know, or admits "I'm just an AI" the moment a user pushes.
 
-This project trains and measures — with real numbers, not a demo video — how much better a model gets at holding a character through a sequence of training techniques.
+This project trains and measures, with real numbers rather than a demo video, how much better a model gets at holding a character through a sequence of training techniques.
 
 **The test character is Serana**, an NPC from the video game *The Elder Scrolls V: Skyrim*, picked for three engineering reasons: an in-universe excuse to know nothing about the modern world (a clean, testable knowledge boundary), a large body of existing dialogue to actually train on, and a well-defined personality to check model output against.
 
 **Two questions, with numbers:**
 
-1. **Model** — the same base model is pushed through four stages: a system prompt alone (**B**, the baseline), then **CPT** (continued pretraining on her dialogue), then **SFT** (supervised fine-tuning on in-character exchanges), then **DPO** (preference optimization). What does each stage actually buy, measured on the same character and the same test questions?
-2. **Hardware** — what does each of those stages *cost* to run on that single L4 GPU — memory used, time taken, dollars spent — and how close does a careful engineer get to the hardware's real ceiling?
+1. **Model:** the same base model is pushed through four stages: a system prompt alone (**B**, the baseline), then **CPT** (continued pretraining on her dialogue), then **SFT** (supervised fine-tuning on in-character exchanges), then **DPO** (preference optimization). What does each stage actually buy, measured on the same character and the same test questions?
+2. **Hardware:** what does each of those stages *cost* to run on that single L4 GPU (memory used, time taken, dollars spent), and how close does a careful engineer get to the hardware's real ceiling?
 
 **Companion docs:**
-- [`DESIGN.md`](DESIGN.md) — full design rationale, hyperparameter-selection method, compute budget
-- [`PROMPTS.md`](PROMPTS.md) — every LLM prompt used, versioned
-- [`CLAUDE.md`](CLAUDE.md) — behavioral rules and build order
+- [`DESIGN.md`](DESIGN.md): full design rationale, hyperparameter-selection method, compute budget
+- [`PROMPTS.md`](PROMPTS.md): every LLM prompt used, versioned
+- [`CLAUDE.md`](CLAUDE.md): behavioral rules and build order
 
 **Adapters:**
 [`machu8/serana-sft`](https://huggingface.co/machu8/serana-sft) · [`machu8/serana-dpo`](https://huggingface.co/machu8/serana-dpo)
 (LoRA, require `Qwen/Qwen3-8B` as base)
 
 **Demo:**
-`demo/app.py` — a Gradio app, one input and three responses (B / SFT / DPO) side by side. Built for HF Spaces' free ZeroGPU tier but not yet deployed there (ZeroGPU currently requires a HF PRO subscription or a community grant). Run it yourself on any CUDA machine:
+`demo/app.py`: a Gradio app, one input and three responses (B / SFT / DPO) side by side. Built for HF Spaces' free ZeroGPU tier but not yet deployed there (ZeroGPU currently requires a HF PRO subscription or a community grant). Run it yourself on any CUDA machine:
 ```bash
 pip install -r demo/requirements.txt && python demo/app.py
 ```
@@ -41,18 +41,18 @@ pip install -r demo/requirements.txt && python demo/app.py
 
 **DPO shows no statistically-confirmed quality gain over SFT on any metric measured.**
 
-PCS, PRS, knowledge-boundary accuracy, style similarity, mean reply length, and distinct-2 all have overlapping 95% CIs between the SFT and DPO rows below. This isn't a single disappointing run — it's corroborated by three independent signals:
+PCS, PRS, knowledge-boundary accuracy, style similarity, mean reply length, and distinct-2 all have overlapping 95% CIs between the SFT and DPO rows below. This isn't a single disappointing run: it's corroborated by three independent signals:
 
 1. DPO's own training metrics were weak (held-out preference accuracy 59.5%, barely above chance; tiny reward margins).
 2. A hand-read smoke test found DPO didn't fix the one regression SFT had (a boundary case where the trained model drops persona framing).
 3. This full CI-backed evaluation pass shows no metric where DPO's confidence interval clears SFT's.
 
-Shipped anyway — the honest result of the pipeline, not the result that was tuned for.
+Shipped anyway: the honest result of the pipeline, not the result that was tuned for.
 Full trail: `artifacts/runs/p4_progress.md` and `p5_progress.md`.
 
 ---
 
-## Results — Quality
+## Results: Quality
 
 - **Model:** `Qwen/Qwen3-8B` · bf16 · 1× NVIDIA L4 24GB, `asia-northeast3` (Seoul)
 - **Driver / CUDA:** 580.173.02, CUDA 12.9 (training) / CUDA 13.0 (serving, via a later `vllm` install)
@@ -65,17 +65,17 @@ Full trail: `artifacts/runs/p4_progress.md` and `p5_progress.md`.
 | DPO | 0.800 [0.633, 0.933] | 0.850 [0.700, 1.000] | 0.234 [0.218, 0.250] | 0.867 [0.733, 0.967] | 24.1 [21.6, 26.7] | 0.590 |
 
 **What PCS/PRS actually are:**
-PCS (persona consistency score) and PRS (persona robustness score, held under 24 direct/meta/role-exit/escalating attack probes) are both a rule-check ∪ LLM-judge union — a reply only counts as a violation/break if *either* signal catches it.
+PCS (persona consistency score) and PRS (persona robustness score, held under 24 direct/meta/role-exit/escalating attack probes) are both a rule-check ∪ LLM-judge union: a reply only counts as a violation/break if *either* signal catches it.
 
 **Reading the CIs:**
 With ~30 quality prompts and ~20 scored attack probes, most CIs are wide. Two differences are real and CI-confirmed:
 
-- B is far more verbose (150 tokens vs ~23–24) — the "info-dump vs. concise in-voice reply" pattern that SFT trains out.
+- B is far more verbose (150 tokens vs ~23–24), the "info-dump vs. concise in-voice reply" pattern that SFT trains out.
 - B also scores *higher* on style similarity than SFT/DPO, opposite DESIGN.md's predicted direction. Most likely explanation: low discriminative power in the embedding metric on this small a reference set (values cluster in a narrow 0.21–0.30 band regardless of input), not a real style regression. Flagged here rather than smoothed over.
 
 Full per-category PRS breakdown and per-prompt data: `artifacts/runs/results_quality.md`, `eval_*.json`.
 
-## Results — Hardware
+## Results: Hardware
 
 | stage/config | predicted VRAM | measured peak VRAM | step time / TTFT p50,p95 | MFU % | throughput | cost |
 |---|---|---|---|---|---|---|
@@ -95,12 +95,12 @@ Throughput scales near-linearly from 1 to 8 (13 → 24 → 45 → 81 tok/s), the
 **AWQ vs bf16** (same merged weights, quantization isolated from the adapter question):
 - 2.44× throughput, 2.7× faster TTFT p50.
 - **No PCS loss** (0.767 vs 0.800, CIs overlap).
-- Total VRAM used stays ~19.3–19.5GB either way — `gpu_memory_utilization=0.9` is a target, not a cap, so AWQ's weight savings (15.36GB → 5.8GB) get redirected almost entirely into **4× more KV-cache capacity** (23,056 → 92,656 tokens), not lower memory used. Stated that way deliberately, since the flatter "AWQ uses less memory" claim would be inaccurate.
+- Total VRAM used stays ~19.3–19.5GB either way. `gpu_memory_utilization=0.9` is a target, not a cap, so AWQ's weight savings (15.36GB → 5.8GB) get redirected almost entirely into **4× more KV-cache capacity** (23,056 → 92,656 tokens), not lower memory used. Stated that way deliberately, since the flatter "AWQ uses less memory" claim would be inaccurate.
 
 **LoRA adapter overhead:**
-~7% between LoRA-on-base and the fully-merged model at matched concurrency — within run-to-run noise at this sample size. Reads as the near-zero overhead DESIGN.md anticipated: post-training bought quality at effectively no serving cost.
+~7% between LoRA-on-base and the fully-merged model at matched concurrency, within run-to-run noise at this sample size. Reads as the near-zero overhead DESIGN.md anticipated: post-training bought quality at effectively no serving cost.
 
-Full predicted-vs-measured trail for every GPU phase — including two real environment bugs found and fixed mid-run (a `flash-attn`/torch ABI break, Qwen3's thinking-mode token budget) — is in `artifacts/runs/p2_progress.md` … `p5_progress.md`.
+Full predicted-vs-measured trail for every GPU phase, including two real environment bugs found and fixed mid-run (a `flash-attn`/torch ABI break, Qwen3's thinking-mode token budget), is in `artifacts/runs/p2_progress.md` … `p5_progress.md`.
 
 ---
 
@@ -108,7 +108,7 @@ Full predicted-vs-measured trail for every GPU phase — including two real envi
 
 - **51.4%** of ingested wiki dialogue lines (UESP + Fandom, CC BY-SA) survived as genuine `(player line, reply)` pairs. The rest are standalone utterances (CPT corpus) or excluded by the horizon filter (nothing after 4E 201 / modern-world topics).
 - The final ~3k SFT set is **7.7% real pairs, 92.3% synthetic** (GPT-4o-generated, matched to the real data's voice). This ratio matters beyond bookkeeping: the more of the pipeline is LLM-authored end to end (SFT data → DPO preference labels → eval scoring), the sharper the circularity concern below.
-- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately against 50 hand-scored human labels (Spearman 0.73, floor 0.6). Any DPO gain would need to show up in a non-judge signal — the PRS regex check, style similarity, or the human labels — to be trusted. Moot here, since DPO didn't show a gain to begin with.
+- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately against 50 hand-scored human labels (Spearman 0.73, floor 0.6). Any DPO gain would need to show up in a non-judge signal (the PRS regex check, style similarity, or the human labels) to be trusted. Moot here, since DPO didn't show a gain to begin with.
 
 ---
 
@@ -116,10 +116,10 @@ Full predicted-vs-measured trail for every GPU phase — including two real envi
 
 `Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI-compatible server, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` on HF Spaces (ZeroGPU) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
 
-PPO/reward-model RLHF is deliberately excluded: the VRAM arithmetic for policy + reference + reward + value simultaneously resident doesn't fit 8B on 24GB (`DESIGN.md` §7.1) — that calculation is itself part of the deliverable.
+PPO/reward-model RLHF is deliberately excluded: the VRAM arithmetic for policy + reference + reward + value simultaneously resident doesn't fit 8B on 24GB (`DESIGN.md` §7.1). That calculation is itself part of the deliverable.
 
 ## Reproducing
 
-Everything needed to reproduce end to end — config schema, build order, GPU-hour budget, prerequisites — is in `DESIGN.md` and `CLAUDE.md`. Runs on one 24GB GPU.
+Everything needed to reproduce end to end (config schema, build order, GPU-hour budget, prerequisites) is in `DESIGN.md` and `CLAUDE.md`. Runs on one 24GB GPU.
 
 `HARNESS_ENGINEERING.md` documents the guardrails (`.claude/hooks/`) used to keep an AI coding agent inside the project's scope and region constraints while building this.
