@@ -58,7 +58,7 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, d
 - **Driver / CUDA:** 580.173.02, CUDA 12.9(학습) / CUDA 13.0(서빙, 이후 `vllm` 설치로 버전이 올라감)
 - **Eval 설정:** in/out-of-boundary 프롬프트 30개 + attack probe 24개 · greedy decoding · 95% bootstrap CI(≥1000 resamples)
 
-| config | PCS | PRS | style sim | knowledge-boundary acc | 평균 응답 길이 | distinct-2 |
+| config | PCS | PRS | style sim | knowledge-boundary acc | mean reply length | distinct-2 |
 |---|---|---|---|---|---|---|
 | B (base + prompt) | 0.733 [0.567, 0.900] | 0.850 [0.650, 1.000] | 0.293 [0.283, 0.303] | 0.833 [0.700, 0.967] | 150.6 [121.8, 181.8] | 0.265 |
 | SFT | 0.800 [0.633, 0.933] | 0.850 [0.700, 1.000] | 0.234 [0.216, 0.252] | 0.933 [0.833, 1.000] | 23.4 [21.0, 25.7] | 0.587 |
@@ -77,15 +77,15 @@ quality 프롬프트 ~30개, 채점된 attack probe ~20개 규모라 대부분 C
 
 ## 결과 — 하드웨어
 
-| stage/config | 예측 VRAM | 실측 peak VRAM | step time / TTFT p50,p95 | MFU % | throughput | 비용 |
+| stage/config | predicted VRAM | measured peak VRAM | step time / TTFT p50,p95 | MFU % | throughput | cost |
 |---|---|---|---|---|---|---|
-| CPT (학습) | – | 9.64 GB | 36.2s (작은 corpus) | – | – | ~$0 |
-| SFT (학습, r=16, lr=2e-4) | – | 9.64 GB | 예측 20–40분 → 실측 4h12m* | 13.5% | – | ~$5 |
-| DPO (학습, Spot preemption 1회 후 재개) | 13–16 GB | ~15 GB | 예측 34–38s/step → 실측 ~27s/step | – | – | ~$0.25 |
-| Serving KV-cache (max_model_len=4096, max_num_seqs=8) | 4.50 GB | 기본 할당 3.17 GB / 완전 활용 시 4.87 GB | – | – | – | – |
-| SFT, LoRA, bf16, concurrency=8 | – | – | p50=0.213s p95=0.422s | – | 80.6 tok/s | – |
-| SFT merged, bf16, concurrency=8 | 15.27 GB | 15.36 GB (weights) | p50=0.247s p95=0.839s | – | 75.4 tok/s | – |
-| SFT merged, **AWQ**, concurrency=8 | 3.82 GB | 5.8 GB (weights) | p50=0.091s p95=0.529s | – | **183.8 tok/s** | – |
+| CPT (training) | – | 9.64 GB | 36.2s (tiny corpus) | – | – | ~$0 |
+| SFT (training, r=16, lr=2e-4) | – | 9.64 GB | predicted 20–40min → measured 4h12m* | 13.5% | – | ~$5 |
+| DPO (training, resumed after 1 Spot preemption) | 13–16 GB | ~15 GB | predicted 34–38s/step → measured ~27s/step | – | – | ~$0.25 |
+| Serving KV-cache (max_model_len=4096, max_num_seqs=8) | 4.50 GB | 3.17 GB default / 4.87 GB to fully utilize | – | – | – | – |
+| SFT via LoRA, bf16, concurrency=8 | – | – | p50=0.213s p95=0.422s | – | 80.6 tok/s | – |
+| SFT merged, bf16, concurrency=8 | 15.27 GB | 15.36 GB weights | p50=0.247s p95=0.839s | – | 75.4 tok/s | – |
+| SFT merged, **AWQ**, concurrency=8 | 3.82 GB | 5.8 GB weights | p50=0.091s p95=0.529s | – | **183.8 tok/s** | – |
 
 \* 숨기지 않은 실제 예측-실측 오차: 실제 SFT 학습 실행에서 `grad_accum_steps`를 override하지 않아서, 로그에 찍힌 "step" 하나가 실제로는 micro-batch 16개였다. 라이브로 원인을 찾아 재개 가능한 checkpoint 버전에서 고쳤다. `artifacts/runs/p2_progress.md` 참고.
 
