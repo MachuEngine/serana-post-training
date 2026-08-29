@@ -7,17 +7,22 @@ English | [한국어](README.ko.md)
 
 <img width="253" height="180" alt="image" src="https://github.com/user-attachments/assets/d9c149da-3c4a-47a5-88ec-ad031ca12dcc" />
 
-An end-to-end **post-training stack** — prompt → CPT → SFT → DPO — applied to the **persona-consistency problem in general-purpose LLMs**, built and measured entirely on **one 24GB GPU** (NVIDIA L4).
+## What this project is
 
-The test bed is **Serana**, an NPC from *The Elder Scrolls V: Skyrim* (Dawnguard):
-- a large existing dialogue footprint,
-- a sharply defined personality,
-- and a natural knowledge boundary — a ~4,000-year-old vampire asleep for millennia, who plausibly knows nothing of the modern world.
+General-purpose chatbot models (like ChatGPT) are trained to be helpful assistants — which also makes them bad at *staying* a specific character. Ask one to roleplay for long enough and it slips: it answers something the character couldn't possibly know, or admits "I'm just an AI" the moment a user pushes.
+
+This project trains and measures — with real numbers, not a demo video — how much better a model gets at holding a character through a sequence of training techniques, and does the entire thing on **one consumer-accessible GPU** (an NVIDIA L4, 24GB — modest next to the hardware that trains models like GPT).
+
+**The test character is Serana**, an NPC (non-player character) from the video game *The Elder Scrolls V: Skyrim* (its *Dawnguard* expansion). She wasn't picked at random:
+
+- She's a ~4,000-year-old vampire who spent centuries sealed away asleep — so it's natural, in-universe, for her to know nothing about recent events or the modern world. That gives a clean, testable line: does the model correctly play dumb about things Serana shouldn't know, instead of confidently making something up?
+- She has a large body of official, already-written dialogue (from the game and fan wikis) — real example text to learn her voice from, not something invented from scratch.
+- She has a distinct, well-documented personality (dry, guarded, quietly caring once she trusts someone) that's easy to check a model's output against.
 
 **Two questions, with numbers:**
 
-1. **Model** — Prompt → CPT → SFT → DPO: what does each stage actually buy on the same persona and the same eval set?
-2. **Hardware** — what does each stage *cost* on a single L4 (VRAM, step time, throughput, dollars), and how close does a careful engineer get to the hardware's ceiling?
+1. **Model** — the same base model is pushed through four stages: a system prompt alone (**B**, the baseline), then **CPT** (continued pretraining on her dialogue), then **SFT** (supervised fine-tuning on in-character exchanges), then **DPO** (preference optimization). What does each stage actually buy, measured on the same character and the same test questions?
+2. **Hardware** — what does each of those stages *cost* to run on that single L4 GPU — memory used, time taken, dollars spent — and how close does a careful engineer get to the hardware's real ceiling?
 
 **Companion docs:**
 - [`DESIGN.md`](DESIGN.md) — full design rationale, hyperparameter-selection method, compute budget
