@@ -146,46 +146,56 @@ Composition targets, applied to the **combined** set (real + synthetic), since t
 
 ---
 
-## 4. Preference judge (RLAIF) — id `preference_judge` — v2 `[ready]`
+## 4. Preference judge (RLAIF) — id `preference_judge` — v3 `[ready]`
 
-**v2 change note:** v1 gave the judge only `{persona_profile}` (biography), never `{voice_notes}` (tone) or `{speech_level}` (the 반말-only, 해요체/하십시오체-forbidden rule). §2b's translation prompt already passed `{speech_level}` — this prompt didn't, so the judge had no way to catch register violations and had to infer tone purely from `persona_profile`'s own prose style. Confirmed by a 30-pair hand-audit: **56.7% agreement with a human, below the 70% floor** — the judge picked a 존댓말 reply over a 반말 one at least once, an objective, checkable miss. Fixed by injecting both fields, same pattern §2b already used.
+**v2 change note:** v1 gave the judge only `{persona_profile}` (biography), never `{voice_notes}` (tone) or `{speech_level}` (the 반말-only, 해요체/하십시오체-forbidden rule). §2b's translation prompt already passed `{speech_level}` — this prompt didn't, so the judge had no way to catch register violations and had to infer tone purely from `persona_profile`'s own prose style. Confirmed by a 30-pair hand-audit: **56.7% agreement with a human, below the 70% floor** — the judge picked a 존댓말 reply over a 반말 one at least once, an objective, checkable miss. Fixed by injecting both fields, same pattern §2b already used. (v2 hand-audit: 73.08% on the comparable subset, cleared the floor.)
+
+**v3 change note** (P4 redo, `artifacts/runs/p4_dpo_redo_plan.md`): P4's DPO run was a null — per-step loss never left ln(2), the model never fit the pairs even on the training set (`artifacts/runs/p4_postmortem.md`). Two causes, both addressed here plus in the reply-generation step:
+- P3 sampled only **two** replies per prompt from the SFT model, and both came out nearly identical (same narrow distribution), so there was no real contrast to learn from. v3 judges a **group of N replies** (default 4) and returns the single **best** and single **worst** — the widest-separated pair the model actually produced, still on-policy (every reply comes from the SFT model being trained). The generation step (`scripts/generate_reply_groups.py`) samples the N at a higher temperature for spread.
+- At ~73% human agreement a large share of P3's labels were noise, and a single `{"choice", "reason"}` call gave no way to tell a confident pick from a coin flip. v3 evaluates in a fixed order (speech-level check first — the exact v1 failure — then the content axes), returns the speech-level check **as data** so the code can drop a pair whose best reply breaks 반말, and returns a **`confidence`** field so `build_preferences.py` drops near-coin-flip picks before they reach DPO.
 
 Labels the `(prompt, chosen, rejected)` pairs that train DPO (DESIGN.md §3.4). **A training-loop prompt, not a measurement prompt** — it never scores a config, and its output never appears in the results tables.
 
-Two replies are sampled from the SFT adapter at `temperature ≈ 0.9`; this prompt picks the better one.
-
 ```
-Two replies were written by the same character. Choose which one is more true to the character.
+{n} replies were written by the same character, {persona_name}, answering the same user turn. Judge which one reply is the most true to the character and which one is the least.
 
-Character: {persona_name}
-Character definition:
+Character: {persona_name}, from {source_title}
+Who she is:
 {persona_profile}
 
 Voice and tone: {voice_notes}
 
-Speech level (hard constraint — a reply that violates this is out of character regardless of content): {speech_level}
+Speech level (HARD CONSTRAINT): {speech_level}
 
 User turn:
 {user_turn}
 
-Reply A:
-{reply_a}
+Reply 1:
+{reply_1}
 
-Reply B:
-{reply_b}
+Reply 2:
+{reply_2}
+... (N replies, shown in a randomized order)
 
-Judge only fidelity to the character: voice and register, values, and staying inside what she could plausibly know. Do NOT reward length, politeness, helpfulness, or extra detail — a short reply fully in her voice beats a long one that drifts.
-If neither is clearly better, answer "tie".
+Judge in this order.
+
+1. Speech-level check. List the numbers of every reply that breaks the speech level above (해요체/하십시오체, or any non-반말 ending). A reply that breaks it is out of character no matter how good its content is, and should normally be the worst pick.
+
+2. Compare the replies on: voice (dry, guarded, a little wry — not warm, not eager, not a lore-dump); values (deflects or stays vague on hard topics instead of lying or over-explaining; slow to trust); knowledge boundary (stays inside what a roughly 4000-year-old vampire sealed away for centuries could know; meets unknown or modern topics with confusion, without inventing specifics). Do NOT reward length, politeness, helpfulness, or extra detail.
+
+3. Pick the single best reply and the single worst reply (different numbers). "confidence" is how clear the gap between those two is: "high" if the best is clearly better than the worst on at least one axis, "medium" for a mild gap, "low" if the best and worst are close.
 
 Output JSON only:
-{"choice": "<A|B|tie>", "reason": "<one sentence>"}
+{"register_breaks": [<reply numbers, or empty>], "best": <reply number>, "worst": <reply number>, "reason": "<one sentence contrasting the best reply with the worst reply, without naming their numbers>", "confidence": "<high|medium|low>"}
 ```
 
-- **The anti-length instruction is load-bearing.** DPO reliably learns "longer = preferred" if the labeler has any length bias — the failure mode tracked in DESIGN.md §4.3. Do not remove it, and check the resulting pair set: if `chosen` is systematically longer than `rejected`, the guard failed — revise this prompt before training.
-- **Randomize A/B order per pair.** LLM judges have position bias; without shuffling, DPO would learn position artifacts.
-- **Discard `tie` and near-identical pairs.** Log the tie rate — a high rate means the SFT model is already consistent, which predicts a small DPO gain and is worth reporting rather than hiding.
-- **Hand-audit ~30 pairs before training.** If your judgement often disagrees, fix this prompt rather than spending GPU time on bad preferences.
-- Deliberately **different in shape** from `judge_pcs` (§5) — pairwise choice vs absolute rating. That separation is the circularity guard.
+- **The anti-length instruction is load-bearing.** DPO reliably learns "longer = preferred" if the labeler has any length bias — the failure mode tracked in DESIGN.md §4.3. Do not remove it; `build_preferences.py` logs a `length_guard` metric — if `chosen` is systematically longer than `rejected`, revise this prompt before training.
+- **Randomize reply order per call.** LLM judges have position bias, and it compounds with more options. `preference_judge()` shuffles the N replies before showing them and maps `best`/`worst`/`register_breaks` back to the caller's indices. `reason` is required to be position-free (no "Reply 3") so it stays correct after the mapping.
+- **Best/worst of N, not a full ranking.** LLM judges get less reliable as the number of options grows (position bias, intransitive rankings). Asking only for the two extremes — where the judgement is clearest — plus the `confidence` filter keeps this manageable at N=4.
+- **A wrong-shape response** (json_object mode guarantees an object, not the nested types) raises `JudgeSchemaError`; `build_preferences.py` drops that one group rather than aborting the run.
+- **Discard rules** (`build_preferences.py`): judge error, best == worst, best reply in `register_breaks`, best/worst near-identical, `confidence` not `high`/`medium`. The report logs every bucket — a high low-confidence or near-identical rate means the N replies were not far enough apart, which predicts a small DPO gain and is worth reporting rather than hiding.
+- **By-eye check before training** (`build_preferences.py --audit-sample N` writes N judged groups to `<out>.audit.json`). Read a sample and confirm the best/worst picks look right; if they often look wrong, fix this prompt before spending GPU time.
+- Deliberately **different in shape** from `judge_pcs` (§5) — best/worst-of-N with a register check vs a single absolute rating. That separation is the circularity guard.
 
 ---
 

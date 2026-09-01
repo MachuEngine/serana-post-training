@@ -47,8 +47,10 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, mean reply length, and 
 2. A hand-read smoke test found DPO didn't fix the one regression SFT had (a boundary case where the trained model drops persona framing).
 3. This full CI-backed evaluation pass shows no metric where DPO's confidence interval clears SFT's.
 
+**Why it's a null.** The DPO training loss never left ln(2): the model never fit the preference pairs even on the training set. The pairs carried little learnable signal, because both the chosen and the rejected reply were sampled from the same already-narrow SFT distribution (so they differed only cosmetically), and the AI judge labeling them agreed with human annotators only ~70% of the time. This is not circularity (which would have *inflated* the judge-scored metrics, and did not) and not a KL-strength problem (which would still have moved the training loss, and did not). It is the honest ceiling of RLAIF when the policy you sample from has already converged and the judge is noisy. A rerun would need more separated candidate replies (sample several from SFT per prompt, take the best-vs-worst pair) and a more reliable judge, a P3 redo that is out of scope here.
+
 Shipped anyway: the honest result of the pipeline, not the result that was tuned for.
-Full trail: `artifacts/runs/p4_progress.md` and `p5_progress.md`.
+Full trail: `artifacts/runs/p4_postmortem.md` (root-cause analysis), `p4_progress.md`, `p5_progress.md`.
 
 ---
 

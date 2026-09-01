@@ -106,6 +106,8 @@ Korean in-character exchanges: real pairs where the wiki preserved them, plus sy
 
 If DPO is worse than SFT, report it. Do not tune until it wins.
 
+**What happened (P4).** DPO produced a corroborated null: no CI-confirmed gain on any quality metric, and knowledge-boundary accuracy trended slightly down. Root cause in `artifacts/runs/p4_postmortem.md`: per-step DPO loss never left ln(2) (the model never fit the pairs even on the training set), because the pairs carried almost no learnable signal: chosen and rejected were both sampled from the same narrow SFT distribution, and the preference judge agreed with humans only ~70% of the time. Not circularity (the judge-scored metrics did not inflate), not a beta problem (the training loss did not move). A rerun would need more separated candidate replies (sample several from SFT per prompt, take best-vs-worst) and a more reliable judge — a P3 redo, planned in `artifacts/runs/p4_dpo_redo_plan.md`, out of scope for this build.
+
 ### 3.5 Training knobs under a 24GB budget (L4)
 
 These live in `config/`, not in code. **They are starting points, not answers** — §3.6 is how they get chosen, §7.2 is how their hardware cost gets quantified.

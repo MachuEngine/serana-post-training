@@ -1,14 +1,29 @@
-"""Preference judge -- PROMPTS.md §4, id `preference_judge` v2. Training-
-loop prompt (DESIGN.md §3.4/§4.4 circularity guard): a pairwise choice,
-deliberately different shape from `judge_pcs` (§5, absolute rating) --
-never reuse this rubric for measurement, never reuse judge_pcs for this.
+"""Preference judge -- PROMPTS.md §4, id `preference_judge` v3. Training-
+loop prompt (DESIGN.md §3.4/§4.4 circularity guard): given N candidate
+replies to one prompt, picks the single best and the single worst.
+Deliberately different shape from `judge_pcs` (§5, an absolute rating) --
+never reuse this rubric for measurement.
 
-v2: added voice_notes/speech_level (v1 gave the judge only persona_profile,
-so it had no explicit register rule and missed 반말/존댓말 violations --
-found via the P3 30-pair hand-audit, see PROMPTS.md §4 v2 change note).
+Background: P4's DPO run was a null (artifacts/runs/p4_postmortem.md).
+P3 had sampled both candidates from serana-sft at temperature 0.9, so the
+two replies were nearly identical and DPO got almost no gradient. v3
+samples N replies (not 2) from the SFT model and takes the best-vs-worst
+pair -- the widest-separated pair the model actually produced, rather than
+two random draws.
 
-Runs entirely off the GPU VM (API-only) per CLAUDE.md cost discipline:
-"CPU/API/local work never runs on the GPU instance."
+Three things the P3 code review flagged, fixed here:
+- A valid-JSON but wrong-shape response (json_object mode guarantees an
+  object, not the nested field types) raises JudgeSchemaError, which the
+  caller drops as one bad group instead of letting an AttributeError
+  abort the whole run.
+- The speech-level check is returned as data (`register_breaks`), so
+  build_preferences.py can drop a pair whose "best" reply breaks 반말
+  (the exact v1 failure), rather than trusting prompt text alone.
+- `reason` is required to contrast "the best reply" with "the worst
+  reply" without naming their positions, so it stays correct after the
+  shown-order is mapped back to the caller's order.
+
+Runs off the GPU VM -- API-only (CLAUDE.md cost discipline).
 """
 
 from __future__ import annotations
@@ -28,49 +43,77 @@ JUDGE_MODEL = yaml.safe_load(open("config/eval.yaml"))["judge"]["model_id"]
 
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-PROMPT = """Two replies were written by the same character. Choose which one is more true to the character.
 
-Character: {persona_name}
-Character definition:
+class JudgeSchemaError(ValueError):
+    """The judge returned valid JSON whose shape does not match the contract."""
+
+
+PROMPT = """{n} replies were written by the same character, {persona_name}, answering the same user turn. Judge which one reply is the most true to the character and which one is the least.
+
+Character: {persona_name}, from {source_title}
+Who she is:
 {persona_profile}
 
 Voice and tone: {voice_notes}
 
-Speech level (hard constraint -- a reply that violates this is out of character regardless of content): {speech_level}
+Speech level (HARD CONSTRAINT): {speech_level}
 
 User turn:
 {user_turn}
 
-Reply A:
-{reply_a}
+{numbered_replies}
 
-Reply B:
-{reply_b}
+Judge in this order.
 
-Judge only fidelity to the character: voice and register, values, and staying inside what she could plausibly know. Do NOT reward length, politeness, helpfulness, or extra detail -- a short reply fully in her voice beats a long one that drifts.
-If neither is clearly better, answer "tie".
+1. Speech-level check. List the numbers of every reply that breaks the speech level above (해요체/하십시오체, or any non-반말 ending). A reply that breaks it is out of character no matter how good its content is, and should normally be the worst pick.
+
+2. Compare the replies on: voice (dry, guarded, a little wry -- not warm, not eager, not a lore-dump); values (deflects or stays vague on hard topics instead of lying or over-explaining; slow to trust); knowledge boundary (stays inside what a roughly 4000-year-old vampire sealed away for centuries could know; meets unknown or modern topics with confusion, without inventing specifics). Do NOT reward length, politeness, helpfulness, or extra detail.
+
+3. Pick the single best reply and the single worst reply (they must be different numbers). "confidence" is how clear the gap between those two is: "high" if the best is clearly better than the worst on at least one axis, "medium" for a mild gap, "low" if the best and worst are close.
 
 Output JSON only:
-{{"choice": "<A|B|tie>", "reason": "<one sentence>"}}"""
+{{"register_breaks": [<reply numbers, or empty>], "best": <reply number>, "worst": <reply number>, "reason": "<one sentence contrasting the best reply with the worst reply, without naming their numbers>", "confidence": "<high|medium|low>"}}"""
 
 
-def preference_judge(user_turn: str, reply_a: str, reply_b: str, rng: random.Random) -> dict:
-    """Randomizes A/B order per call (PROMPTS.md §4: "LLM judges have
-    position bias; without shuffling, DPO would learn position artifacts")
-    and un-shuffles the result before returning, so the caller always gets
-    'a'/'b' relative to its own reply_a/reply_b arguments, not the judge's
-    internal randomized order."""
-    swapped = rng.random() < 0.5
-    shown_a, shown_b = (reply_b, reply_a) if swapped else (reply_a, reply_b)
+def _idx(value: object, n: int, field: str) -> int:
+    """1-based reply number from the judge -> validated 0-based position
+    in the shown order."""
+    if isinstance(value, bool) or not isinstance(value, int) or not (1 <= value <= n):
+        raise JudgeSchemaError(f"{field}={value!r} is not an integer in 1..{n}")
+    return value - 1
+
+
+def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> dict:
+    """Shows the N replies in a random order (LLM judges have position
+    bias) and maps the judge's picks back to the caller's indices.
+
+    Returns: `best`/`worst` as 0-based indices into `replies`,
+    `register_breaks` as a set of 0-based indices, `confidence`
+    (high|medium|low|None), and `reason` (position-free text, safe to
+    store next to the caller-order result).
+
+    Raises JudgeSchemaError on a valid-JSON / wrong-shape response.
+    """
+    n = len(replies)
+    if n < 2:
+        # a group with < 2 replies is unjudgeable -- surface it the same way
+        # as a bad judge response so the caller drops the one group
+        raise JudgeSchemaError(f"group has {n} replies, need at least 2")
+
+    order = list(range(n))  # order[shown_position] = caller_index
+    rng.shuffle(order)
+    shown = [replies[caller_i] for caller_i in order]
+    numbered = "\n\n".join(f"Reply {i + 1}:\n{r}" for i, r in enumerate(shown))
 
     prompt = PROMPT.format(
+        n=n,
         persona_name=PERSONA["persona_name"],
+        source_title=PERSONA["source_title"],
         persona_profile=PERSONA["persona_profile"].strip(),
         voice_notes=PERSONA["voice_notes"].strip(),
         speech_level=PERSONA["speech_level"].strip(),
         user_turn=user_turn,
-        reply_a=shown_a,
-        reply_b=shown_b,
+        numbered_replies=numbered,
     )
     resp = client.chat.completions.create(
         model=JUDGE_MODEL,
@@ -78,13 +121,31 @@ def preference_judge(user_turn: str, reply_a: str, reply_b: str, rng: random.Ran
         temperature=0.0,
         response_format={"type": "json_object"},
     )
-    result = json.loads(resp.choices[0].message.content)
-    choice = result.get("choice")
-    if swapped and choice in ("A", "B"):
-        choice = "B" if choice == "A" else "A"
-    # Note: "reason" is the model's raw text and still refers to whatever
-    # order it was actually shown (shown_a/shown_b) -- it is NOT re-labeled
-    # to match the un-swapped `choice` above. When swapped is True, a reason
-    # mentioning "Reply A" may describe the caller's reply_b. Treat `reason`
-    # as descriptive only; never parse it programmatically against `choice`.
-    return {"choice": choice, "reason": result.get("reason")}
+    try:
+        result = json.loads(resp.choices[0].message.content)
+    except json.JSONDecodeError as e:  # json_object mode should preclude this
+        raise JudgeSchemaError(f"non-JSON response: {e}") from e
+    if not isinstance(result, dict):
+        raise JudgeSchemaError(f"top-level JSON is {type(result).__name__}, not an object")
+
+    best = order[_idx(result.get("best"), n, "best")]
+    worst = order[_idx(result.get("worst"), n, "worst")]
+
+    breaks = set()
+    raw_breaks = result.get("register_breaks")
+    if isinstance(raw_breaks, list):
+        for v in raw_breaks:
+            if not isinstance(v, bool) and isinstance(v, int) and 1 <= v <= n:
+                breaks.add(order[v - 1])
+
+    conf = result.get("confidence")
+    if conf not in ("high", "medium", "low"):
+        conf = None
+
+    return {
+        "best": best,
+        "worst": worst,
+        "register_breaks": breaks,
+        "confidence": conf,
+        "reason": result.get("reason"),
+    }

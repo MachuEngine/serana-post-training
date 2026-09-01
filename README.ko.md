@@ -48,7 +48,9 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, d
 3. 이번 CI 기반 전체 평가에서도 DPO의 신뢰구간이 SFT를 앞서는 지표가 하나도 없다.
 
 그래도 그대로 출시했다. 튜닝해서 이기게 만든 결과가 아니라 파이프라인의 정직한 결과이기 때문이다.
-전체 과정: `artifacts/runs/p4_progress.md`, `p5_progress.md`.
+**왜 널(null)인가.** DPO 학습 loss가 ln(2)를 벗어난 적이 없다: 학습셋에서조차 선호쌍을 못 맞췄다는 뜻이다. 선호쌍에 학습 가능한 신호가 거의 없었는데, chosen과 rejected 둘 다 이미 좁아진 같은 SFT 분포에서 샘플돼 사소하게만 달랐고, 이를 라벨한 AI judge는 사람과 ~70%만 일치했다. 이것은 circularity가 아니며(circularity였다면 judge 기반 지표가 *부풀었을* 텐데 그러지 않았다), KL 강도(beta) 문제도 아니다(그랬다면 학습 loss라도 움직였을 텐데 그러지 않았다). 샘플링하는 정책이 이미 수렴했고 judge가 노이즈일 때 RLAIF가 갖는 정직한 한계다. 다시 돌린다면 더 벌어진 후보 응답(프롬프트마다 SFT에서 여러 개 샘플해 best-vs-worst 쌍을 취함)과 더 믿을 만한 judge가 필요한데, P3를 다시 하는 것이라 여기서는 범위 밖이다.
+
+전체 과정: `artifacts/runs/p4_postmortem.md`(근본 원인 분석), `p4_progress.md`, `p5_progress.md`.
 
 ---
 
