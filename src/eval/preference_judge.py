@@ -78,7 +78,10 @@ Output JSON only:
 
 def _idx(value: object, n: int, field: str) -> int:
     """1-based reply number from the judge -> validated 0-based position
-    in the shown order."""
+    in the shown order. Tolerates a string digit ("2"), which the model
+    returns often enough that dropping the group over it is wasteful."""
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
     if isinstance(value, bool) or not isinstance(value, int) or not (1 <= value <= n):
         raise JudgeSchemaError(f"{field}={value!r} is not an integer in 1..{n}")
     return value - 1
@@ -152,9 +155,18 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
         conf = None
 
     reason = result.get("reason")
-    # A reason that names a shown-order position ("Reply 2", "2번 답변", "세 번째")
-    # would mislead once best/worst are mapped back to caller order -- drop it.
-    _POS = r"reply\s*#?\s*\d|\d\s*번(?:째)?|답변\s*\d|\d\s*번?\s*답변|(?:첫|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*번째|(?:첫|둘|셋|넷|다섯)째"
+    # A reason that names a reply by its shown-order position would mislead
+    # once best/worst are mapped back to caller order -- drop it. Kept narrow
+    # (position word next to "답변"/"reply", or an ordinal with the 째 suffix)
+    # so it does not fire on "4번 화제" and similar. The audit rows also carry
+    # the resolved chosen/rejected text, so a missed case is still checkable.
+    _POS = (
+        r"reply\s*#?\s*\d"
+        r"|답변\s*#?\s*\d"
+        r"|\d\s*번(?:째)?\s*답변"
+        r"|\d\s*번째"
+        r"|(?:첫|두|세|네|다섯|여섯|일곱|여덟)\s*번째"
+    )
     if isinstance(reason, str) and re.search(_POS, reason, re.IGNORECASE):
         reason = None
 

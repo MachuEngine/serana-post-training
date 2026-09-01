@@ -60,23 +60,27 @@ def normalize(text: str) -> str:
     return " ".join(text.lower().split()).strip(" .!?\"'")
 
 
-def judge_with_retry(prompt: str, replies: list[str], seed: int) -> dict | None:
-    """Judge result, or None if the group is unjudgeable (schema error).
-    Transient API errors are retried; anything else propagates so the run
-    fails fast instead of silently dropping every group."""
+def judge_with_retry(prompt: str, replies: list[str], seed: int) -> dict | str:
+    """A judge result dict, or a marker string:
+      "schema"    -- unjudgeable group (bad response shape); fine to drop.
+      "api_error" -- transient API error that outlasted MAX_RETRIES; an
+                     infrastructure problem, counted separately so a run
+                     that lost many groups to it is not mistaken for a
+                     clean one.
+    A non-retryable error (auth, wrong model, $0 balance) propagates."""
     rng = random.Random(seed)
     for attempt in range(MAX_RETRIES):
         try:
             return preference_judge(prompt, replies, rng)
         except JudgeSchemaError:
-            return None
+            return "schema"
         except RateLimitError as e:
             if getattr(e, "code", None) == "insufficient_quota":
                 raise  # $0 balance -- no amount of retrying fixes it
             time.sleep(min(2**attempt, 60))
         except RETRYABLE:
             time.sleep(min(2**attempt, 60))
-    return None
+    return "api_error"
 
 
 def main() -> None:
@@ -97,7 +101,7 @@ def main() -> None:
     groups = [json.loads(line) for line in open(args.in_path)]
     print(f"judging {len(groups)} reply groups from {args.in_path}...")
 
-    judged: list[dict | None] = [None] * len(groups)
+    judged: list[dict | str | None] = [None] * len(groups)
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         futs = {
             ex.submit(judge_with_retry, g["prompt"], g["replies"], i): i
@@ -116,7 +120,16 @@ def main() -> None:
             raise
 
     funnel = dict.fromkeys(
-        ("error", "best_equals_worst", "register", "near_duplicate", "low_confidence", "kept"), 0
+        (
+            "schema_error",
+            "api_error",
+            "best_equals_worst",
+            "register",
+            "near_duplicate",
+            "low_confidence",
+            "kept",
+        ),
+        0,
     )
     # confidence distribution over every group with a valid best/worst pick,
     # independent of the later filters -- a separate view, not part of the funnel
@@ -125,8 +138,11 @@ def main() -> None:
     preferences = []
     audit_rows = []
     for g, j in zip(groups, judged):
-        if j is None:
-            funnel["error"] += 1
+        if j == "schema":
+            funnel["schema_error"] += 1
+            continue
+        if j == "api_error":
+            funnel["api_error"] += 1
             continue
         best_i, worst_i = j["best"], j["worst"]
         if best_i == worst_i:
@@ -235,6 +251,14 @@ def main() -> None:
         audit_path = os.path.splitext(args.out_path)[0] + ".audit.json"
         with open(audit_path, "w") as f:
             json.dump(audit_rows, f, indent=2, ensure_ascii=False)
+
+    api_error_limit = max(10, len(groups) // 20)  # 5%, floor 10
+    if funnel["api_error"] > api_error_limit:
+        sys.exit(
+            f"{funnel['api_error']} groups lost to API errors (limit {api_error_limit}); "
+            f"see {args.report_path}. not writing a partial training file -- rerun once "
+            "the API is healthy."
+        )
 
     if not preferences:
         sys.exit(

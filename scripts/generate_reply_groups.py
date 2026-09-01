@@ -62,6 +62,7 @@ def main() -> None:
         "--limit", type=int, default=None, help="cap prompt count for a timing test"
     )
     parser.add_argument("--out", default="data/ko/raw/reply_groups_v3.jsonl")
+    parser.add_argument("--report", default="artifacts/runs/p4redo_generation_report.json")
     args = parser.parse_args()
 
     prompts = [json.loads(line)["prompt"] for line in open("data/ko/dpo_prompt_pool.jsonl")]
@@ -130,7 +131,7 @@ def main() -> None:
         else None,
     }
     print(json.dumps(report, indent=2))
-    with open("artifacts/runs/p4redo_generation_report.json", "w") as f:
+    with open(args.report, "w") as f:
         json.dump(report, f, indent=2)
 
 
