@@ -1,7 +1,8 @@
 """P4 redo (artifacts/runs/p4_dpo_redo_plan.md): sample N replies per
 prompt from the SFT adapter, so the preference judge has a spread to pick
 the best and worst from. Supersedes the P3 2-reply script
-(`generate_replies.py`, removed): run with `--n 2` for the old behaviour.
+(`generate_replies.py`, removed): `--n 2 --temperature 0.9` reproduces
+P3's sampling (the default here is N=4 at temperature 1.0 for more spread).
 
 P3 sampled only 2 replies per prompt and both came out nearly identical
 (same narrow SFT distribution), which left DPO with almost no gradient

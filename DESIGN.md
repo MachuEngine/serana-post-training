@@ -89,14 +89,14 @@ Korean in-character exchanges: real pairs where the wiki preserved them, plus sy
 
 **Why the reference model is free here.** DPO's loss needs log-probs from a frozen reference policy. Loading a second 8B model would blow the budget. With PEFT, the reference is obtained by **disabling the adapter** on the same base weights — TRL's `DPOTrainer` supports `ref_model=None` when the policy is a PEFT model. So DPO costs roughly one model in memory, not two. **Verify, don't assert:** record peak VRAM for DPO and confirm it is comparable to SFT.
 
-**Preference data (RLAIF), built in P3:**
+**Preference data (RLAIF).** The shipped `serana-dpo` adapter was built in P3 from an earlier form of this step (two replies per prompt from the SFT adapter at temperature 0.9, a pairwise judge, ties discarded), which produced the P4 null — see "What happened" below. The current pipeline, for the rerun planned in `artifacts/runs/p4_dpo_redo_plan.md`:
 
-1. Draw ~1,000 prompts from the same distribution as the SFT set — but **not** eval prompts or attack probes.
-2. Sample **two** replies per prompt from the SFT adapter at `temperature ≈ 0.9`. (Sampling here is intentional and does not conflict with the greedy-decoding rule, which governs *evaluation* only — §4.5.)
-3. The **preference judge** (PROMPTS.md §4) picks the more in-character reply, or declares a tie.
-4. Emit `(prompt, chosen, rejected)`. **Discard ties** and near-identical pairs — no contrast means noise.
-5. Log the tie and discard rates. A high tie rate means the SFT model is already consistent, which predicts a small DPO gain and should be reported, not hidden.
-6. **Hand-audit ~30 pairs** before training. If your judgement often disagrees with the judge, fix the preference prompt before spending GPU time.
+1. Draw ~900 prompts from the same distribution as the SFT set — but **not** eval prompts or attack probes (`data/ko/dpo_prompt_pool.jsonl`, leakage-checked in P1).
+2. Sample **N replies** per prompt (default 4) from the SFT adapter at `temperature ≈ 1.0` (`scripts/generate_reply_groups.py`). Every reply comes from the model being trained, so both extremes stay on-policy. (Sampling here is intentional and does not conflict with the greedy-decoding rule, which governs *evaluation* only — §4.5.)
+3. The **preference judge** (PROMPTS.md §4) picks the single best and single worst of the N, lists which replies break 반말, and gives a `confidence`.
+4. Emit the best/worst pair as `(prompt, chosen, rejected)`. Drop a group when: the judge errored, best == worst, the best reply breaks 반말, best and worst are near-identical, or confidence is not high/medium.
+5. `build_preferences.py` logs a funnel (every group in exactly one bucket), the confidence distribution, a length-guard metric, and an automated cross-check of the judge's register call against the `rule_checks.py` regex.
+6. **By-eye check ~30 pairs** before training (`--audit-sample`). Disagree with the judge on more than ~9 of 30 → fix the prompt before spending GPU time. P3 ran a formal human-labeled audit with a 0.7 agreement floor; the rerun trades that for the manual check plus the automated register cross-check, since fresh human labels on best-of-N pairs are not being produced.
 
 **Key hyperparameters** (`config/`, §5.3): `beta` (KL strength — the main knob), learning rate (~an order of magnitude below SFT), epochs (1–2; DPO overfits preference sets quickly).
 
@@ -106,7 +106,9 @@ Korean in-character exchanges: real pairs where the wiki preserved them, plus sy
 
 If DPO is worse than SFT, report it. Do not tune until it wins.
 
-**What happened (P4).** DPO produced a corroborated null: no CI-confirmed gain on any quality metric, and knowledge-boundary accuracy trended slightly down. Root cause in `artifacts/runs/p4_postmortem.md`: per-step DPO loss never left ln(2) (the model never fit the pairs even on the training set), because the pairs carried almost no learnable signal: chosen and rejected were both sampled from the same narrow SFT distribution, and the preference judge agreed with humans only ~70% of the time. Not circularity (the judge-scored metrics did not inflate), not a beta problem (the training loss did not move). A rerun would need more separated candidate replies (sample several from SFT per prompt, take best-vs-worst) and a more reliable judge — a P3 redo, planned in `artifacts/runs/p4_dpo_redo_plan.md`, out of scope for this build.
+**What happened (P4).** DPO produced a corroborated null: no CI-confirmed gain on any quality metric, and knowledge-boundary accuracy trended slightly down. Root cause in `artifacts/runs/p4_postmortem.md`: per-step DPO loss never left ln(2) (the model never fit the pairs even on the training set), because the pairs carried almost no learnable signal: chosen and rejected were both sampled from the same narrow SFT distribution, and the preference judge agreed with humans only ~70% of the time. Not circularity (the judge-scored metrics did not inflate), not a beta problem (the training loss did not move).
+
+The rerun that addresses both causes — best-of-N on-policy pairs and the v3 judge above — is specified in `artifacts/runs/p4_dpo_redo_plan.md` and its pipeline code is in the repo, but it has **not been run**: the shipped adapters and results tables are still P3/P4. Still out of scope regardless of the rerun's outcome: scaling to several thousand pairs, a beta grid sweep, PPO.
 
 ### 3.5 Training knobs under a 24GB budget (L4)
 
@@ -235,7 +237,7 @@ Publishing these unprompted is the point — it shows you knew the failure mode 
 
 **The circularity problem.** An LLM labels the preference pairs that train DPO, and an LLM scores the output — and per §3.1, much of the SFT data is LLM-generated too. If the same rubric does the training and the scoring, DPO's gain on judge-scored metrics is partly self-fulfilling. Three required mitigations:
 
-1. **Separate prompts, separate rubrics.** `preference_judge` makes a *pairwise* choice; `judge_pcs` makes an *absolute* rating with a violation call.
+1. **Separate prompts, separate rubrics.** `preference_judge` picks the best and worst of N candidate replies; `judge_pcs` makes an *absolute* rating with a violation call.
 2. **Corroborate with a non-judge signal.** DPO's gain must show up in at least one of: the PRS regex check, style similarity (no LLM judgement), or the 50 human labels. A gain visible *only* to the eval judge is reported as unconfirmed.
 3. **Say it in the README**, alongside the real-pair-vs-synthetic ratio from §3.1.
 

@@ -3,20 +3,26 @@ from scripts/generate_reply_groups.py -- each group is N replies the SFT
 model produced for one prompt -- and emit the final (prompt, chosen,
 rejected) preference set.
 
-Each group's pair is (judge's best reply, judge's worst reply). A group
-is dropped when:
-  - the judge errored or returned a wrong-shape response (JudgeSchemaError),
-  - best and worst are the same reply,
-  - the best reply is one the judge flagged as breaking 반말 (v1's failure
-    mode -- a register violation should never be the preferred output),
-  - best and worst are near-identical after normalization,
-  - the pick's confidence is not in KEEP_CONFIDENCE (the near-coin-flip
-    picks are what gave P4's DPO run no learnable signal).
+Each group's pair is (judge's best reply, judge's worst reply). Every
+group lands in exactly one funnel bucket (they sum to n_groups):
+  error            -- judge errored or returned a wrong-shape response
+  best_equals_worst
+  register         -- the best reply is one the judge flagged as breaking
+                      반말 (v1's failure mode -- a register violation should
+                      never be the preferred output)
+  near_duplicate   -- best and worst are near-identical after normalization
+  low_confidence   -- pick confidence not in KEEP_CONFIDENCE (near-coin-flip
+                      picks are what gave P4's DPO run no learnable signal)
+  kept
+
+Exits non-zero if no pairs survive, rather than writing an empty training
+file (the P1/P3 lesson: a silent "exit 0 with near-empty output" is worse
+than a crash).
 
 Default paths are the redo's own, so this does NOT overwrite the shipped
 P3 artifacts (data/ko/prefs_1k.jsonl, artifacts/runs/p3_preference_report.json).
-`--audit-sample N` also writes N judged groups to a readable file for a
-by-eye sanity check of the judge's picks.
+`--audit-sample N` writes N judged groups to <out>.audit.json for a
+by-eye check of the judge's picks.
 
 Runs off the GPU VM -- API-only (CLAUDE.md cost discipline).
 """
@@ -25,7 +31,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
@@ -33,19 +41,19 @@ from difflib import SequenceMatcher
 from openai import APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
 
 from src.eval.preference_judge import JudgeSchemaError, preference_judge
+from src.eval.rule_checks import breaks_register
 
 MAX_WORKERS = 2  # gpt-4o TPM cap bit us in P1 at higher concurrency.
 MAX_RETRIES = 8
 NEAR_DUP_THRESHOLD = 0.92
 KEEP_CONFIDENCE = ("high", "medium")  # drop "low"/missing -- the v3 signal filter
 
-# Retried: rate limits, timeouts, connection drops, 5xx. NOT retried (fail
-# fast): auth errors, a wrong judge model_id, bad-request -- those never
-# recover, and the P3 lesson was that a silent "exit 0 with near-empty
-# output" is worse than a crash. Note: a $0 balance surfaces as
-# RateLimitError (insufficient_quota), so a persistent RateLimitError spike
-# still means "check the OpenAI billing dashboard", as in P3.
-RETRYABLE = (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
+# Retried: genuine rate limits, timeouts, connection drops, 5xx. NOT retried
+# (fail fast): auth errors, a wrong judge model_id, bad-request, and a $0
+# balance -- openai raises insufficient_quota as RateLimitError, and that is
+# the one that actually bit this project twice (P1, P3); retrying it just
+# burns hours of backoff before writing nothing.
+RETRYABLE = (APITimeoutError, APIConnectionError, InternalServerError)
 
 
 def normalize(text: str) -> str:
@@ -54,14 +62,18 @@ def normalize(text: str) -> str:
 
 def judge_with_retry(prompt: str, replies: list[str], seed: int) -> dict | None:
     """Judge result, or None if the group is unjudgeable (schema error).
-    Transient API errors are retried; any other exception propagates so
-    the run fails fast instead of silently dropping every group."""
+    Transient API errors are retried; anything else propagates so the run
+    fails fast instead of silently dropping every group."""
     rng = random.Random(seed)
     for attempt in range(MAX_RETRIES):
         try:
             return preference_judge(prompt, replies, rng)
         except JudgeSchemaError:
             return None
+        except RateLimitError as e:
+            if getattr(e, "code", None) == "insufficient_quota":
+                raise  # $0 balance -- no amount of retrying fixes it
+            time.sleep(min(2**attempt, 60))
         except RETRYABLE:
             time.sleep(min(2**attempt, 60))
     return None
@@ -98,19 +110,40 @@ def main() -> None:
             if done % 50 == 0:
                 print(f"  {done}/{len(groups)}")
 
-    n_error = n_same = n_register = n_near_dup = n_low_conf = 0
-    conf_buckets = {"high": 0, "medium": 0, "low": 0, "missing": 0}
+    funnel = dict.fromkeys(
+        ("error", "best_equals_worst", "register", "near_duplicate", "low_confidence", "kept"), 0
+    )
+    # confidence distribution over every group with a valid best/worst pick,
+    # independent of the later filters -- a separate view, not part of the funnel
+    conf_dist = {"high": 0, "medium": 0, "low": 0, "missing": 0}
+    reg_agree = reg_judge_only = reg_regex_only = reg_checked = 0
     preferences = []
     audit_rows = []
     for g, j in zip(groups, judged):
         if j is None:
-            n_error += 1
+            funnel["error"] += 1
             continue
         best_i, worst_i = j["best"], j["worst"]
         if best_i == worst_i:
-            n_same += 1
+            funnel["best_equals_worst"] += 1
             continue
         chosen, rejected = g["replies"][best_i], g["replies"][worst_i]
+
+        conf = j["confidence"]
+        conf_dist[conf if conf in conf_dist else "missing"] += 1
+
+        # Cross-check the judge's register call against the regex (rule_checks).
+        # A high regex_only count means the judge is not doing its register job.
+        for idx, reply in enumerate(g["replies"]):
+            reg_checked += 1
+            judge_flag = idx in j["register_breaks"]
+            regex_flag = breaks_register(reply)
+            if judge_flag == regex_flag:
+                reg_agree += 1
+            elif judge_flag:
+                reg_judge_only += 1
+            else:
+                reg_regex_only += 1
 
         if len(audit_rows) < args.audit_sample:
             audit_rows.append(
@@ -120,27 +153,25 @@ def main() -> None:
                     "best_idx": best_i,
                     "worst_idx": worst_i,
                     "register_breaks_idx": sorted(j["register_breaks"]),
-                    "confidence": j["confidence"],
+                    "confidence": conf,
                     "reason": j["reason"],
                 }
             )
 
-        conf = j["confidence"]
-        conf_buckets[conf if conf in conf_buckets else "missing"] += 1
-
         if best_i in j["register_breaks"]:
-            n_register += 1  # judge preferred a 반말-violating reply -- distrust the pick
+            funnel["register"] += 1
             continue
         if (
             SequenceMatcher(None, normalize(chosen), normalize(rejected)).ratio()
             > NEAR_DUP_THRESHOLD
         ):
-            n_near_dup += 1
+            funnel["near_duplicate"] += 1
             continue
         if conf not in KEEP_CONFIDENCE:
-            n_low_conf += 1
+            funnel["low_confidence"] += 1
             continue
 
+        funnel["kept"] += 1
         preferences.append(
             {
                 "prompt": g["prompt"],
@@ -150,14 +181,6 @@ def main() -> None:
                 "reason": j["reason"],
             }
         )
-
-    with open(args.out_path, "w") as f:
-        for p in preferences:
-            f.write(json.dumps(p, ensure_ascii=False) + "\n")
-    if args.audit_sample:
-        audit_path = args.out_path.rsplit(".", 1)[0] + ".audit.json"
-        with open(audit_path, "w") as f:
-            json.dump(audit_rows, f, indent=2, ensure_ascii=False)
 
     # Length guard (DESIGN.md §4.3): DPO learns "longer = preferred" if the
     # judge has any length bias. If chosen is systematically longer than
@@ -177,13 +200,14 @@ def main() -> None:
         "input": args.in_path,
         "n_groups": len(groups),
         "replies_per_group": len(groups[0]["replies"]) if groups else None,
-        "n_judge_error": n_error,
-        "n_best_equals_worst": n_same,
-        "n_register_violation_discarded": n_register,
-        "n_near_duplicate_discarded": n_near_dup,
-        "n_low_confidence_discarded": n_low_conf,
-        "kept_confidence": list(KEEP_CONFIDENCE),
-        "confidence_buckets": conf_buckets,
+        "funnel": funnel,  # sums to n_groups
+        "confidence_of_valid_picks": conf_dist,
+        "register_check_vs_regex": {
+            "replies_checked": reg_checked,
+            "agree": reg_agree,
+            "judge_flagged_only": reg_judge_only,
+            "regex_flagged_only": reg_regex_only,
+        },
         "n_final_preference_pairs": len(preferences),
         "length_guard": {
             "chosen_longer_frac": round(longer / len(preferences), 3) if preferences else None,
@@ -193,6 +217,20 @@ def main() -> None:
     print(json.dumps(report, indent=2, ensure_ascii=False))
     with open(args.report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
+
+    if not preferences:
+        sys.exit(
+            f"no preference pairs survived ({args.in_path} -> 0); see {args.report_path}. "
+            "not writing an empty training file."
+        )
+
+    with open(args.out_path, "w") as f:
+        for p in preferences:
+            f.write(json.dumps(p, ensure_ascii=False) + "\n")
+    if args.audit_sample:
+        audit_path = os.path.splitext(args.out_path)[0] + ".audit.json"
+        with open(audit_path, "w") as f:
+            json.dump(audit_rows, f, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

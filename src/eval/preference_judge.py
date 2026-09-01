@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 
 import yaml
 from dotenv import load_dotenv
@@ -89,8 +90,11 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
 
     Returns: `best`/`worst` as 0-based indices into `replies`,
     `register_breaks` as a set of 0-based indices, `confidence`
-    (high|medium|low|None), and `reason` (position-free text, safe to
-    store next to the caller-order result).
+    (high|medium|low|None), and `reason`. The prompt asks for a
+    position-free `reason`, but the model is not fully bound by that, so
+    a reason that still names a reply number ("Reply 2 is ...") is
+    dropped rather than stored next to the caller-order fields where it
+    would mislead the auditor.
 
     Raises JudgeSchemaError on a valid-JSON / wrong-shape response.
     """
@@ -142,10 +146,14 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
     if conf not in ("high", "medium", "low"):
         conf = None
 
+    reason = result.get("reason")
+    if isinstance(reason, str) and re.search(r"reply\s*#?\s*\d", reason, re.IGNORECASE):
+        reason = None  # names a shown-order position -> would mislead once mapped back
+
     return {
         "best": best,
         "worst": worst,
         "register_breaks": breaks,
         "confidence": conf,
-        "reason": result.get("reason"),
+        "reason": reason,
     }
