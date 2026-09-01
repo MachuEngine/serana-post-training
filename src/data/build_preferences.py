@@ -103,12 +103,17 @@ def main() -> None:
             ex.submit(judge_with_retry, g["prompt"], g["replies"], i): i
             for i, g in enumerate(groups)
         }
-        done = 0
-        for fut in as_completed(futs):
-            judged[futs[fut]] = fut.result()
-            done += 1
-            if done % 50 == 0:
-                print(f"  {done}/{len(groups)}")
+        try:
+            done = 0
+            for fut in as_completed(futs):
+                judged[futs[fut]] = fut.result()
+                done += 1
+                if done % 50 == 0:
+                    print(f"  {done}/{len(groups)}")
+        except BaseException:
+            for f in futs:  # a non-retryable error -> stop the queued API calls
+                f.cancel()
+            raise
 
     funnel = dict.fromkeys(
         ("error", "best_equals_worst", "register", "near_duplicate", "low_confidence", "kept"), 0
@@ -152,13 +157,19 @@ def main() -> None:
                     "replies": g["replies"],
                     "best_idx": best_i,
                     "worst_idx": worst_i,
+                    "chosen": chosen,
+                    "rejected": rejected,
                     "register_breaks_idx": sorted(j["register_breaks"]),
+                    "regex_flags_chosen": breaks_register(chosen),
                     "confidence": conf,
                     "reason": j["reason"],
                 }
             )
 
-        if best_i in j["register_breaks"]:
+        # Drop the pair if the best reply breaks 반말 by EITHER signal: the
+        # judge's flag or the non-circular regex. The judge is ~73% reliable
+        # and can miss it (v1's failure); the regex is the backstop.
+        if best_i in j["register_breaks"] or breaks_register(chosen):
             funnel["register"] += 1
             continue
         if (
@@ -218,19 +229,22 @@ def main() -> None:
     with open(args.report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
+    # Written before the empty-set check: when everything is filtered out,
+    # the audit file is exactly the diagnostic you need.
+    if args.audit_sample:
+        audit_path = os.path.splitext(args.out_path)[0] + ".audit.json"
+        with open(audit_path, "w") as f:
+            json.dump(audit_rows, f, indent=2, ensure_ascii=False)
+
     if not preferences:
         sys.exit(
-            f"no preference pairs survived ({args.in_path} -> 0); see {args.report_path}. "
-            "not writing an empty training file."
+            f"no preference pairs survived ({args.in_path} -> 0); see {args.report_path} "
+            f"and the audit file. not writing an empty training file."
         )
 
     with open(args.out_path, "w") as f:
         for p in preferences:
             f.write(json.dumps(p, ensure_ascii=False) + "\n")
-    if args.audit_sample:
-        audit_path = os.path.splitext(args.out_path)[0] + ".audit.json"
-        with open(audit_path, "w") as f:
-            json.dump(audit_rows, f, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

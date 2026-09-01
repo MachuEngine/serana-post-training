@@ -125,9 +125,12 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
         temperature=0.0,
         response_format={"type": "json_object"},
     )
+    content = resp.choices[0].message.content
+    if not content:  # e.g. finish_reason == "content_filter" -> content is None
+        raise JudgeSchemaError("empty response content")
     try:
-        result = json.loads(resp.choices[0].message.content)
-    except json.JSONDecodeError as e:  # json_object mode should preclude this
+        result = json.loads(content)
+    except (json.JSONDecodeError, TypeError) as e:  # json_object mode should preclude this
         raise JudgeSchemaError(f"non-JSON response: {e}") from e
     if not isinstance(result, dict):
         raise JudgeSchemaError(f"top-level JSON is {type(result).__name__}, not an object")
@@ -139,6 +142,8 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
     raw_breaks = result.get("register_breaks")
     if isinstance(raw_breaks, list):
         for v in raw_breaks:
+            if isinstance(v, str) and v.isdigit():  # model sometimes returns "1" not 1
+                v = int(v)
             if not isinstance(v, bool) and isinstance(v, int) and 1 <= v <= n:
                 breaks.add(order[v - 1])
 
@@ -147,8 +152,11 @@ def preference_judge(user_turn: str, replies: list[str], rng: random.Random) -> 
         conf = None
 
     reason = result.get("reason")
-    if isinstance(reason, str) and re.search(r"reply\s*#?\s*\d", reason, re.IGNORECASE):
-        reason = None  # names a shown-order position -> would mislead once mapped back
+    # A reason that names a shown-order position ("Reply 2", "2번 답변", "세 번째")
+    # would mislead once best/worst are mapped back to caller order -- drop it.
+    _POS = r"reply\s*#?\s*\d|\d\s*번(?:째)?|답변\s*\d|\d\s*번?\s*답변|(?:첫|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*번째|(?:첫|둘|셋|넷|다섯)째"
+    if isinstance(reason, str) and re.search(_POS, reason, re.IGNORECASE):
+        reason = None
 
     return {
         "best": best,
