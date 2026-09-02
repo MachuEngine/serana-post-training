@@ -20,6 +20,7 @@ real data and need their own predicted-vs-measured pass, not this one.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -103,7 +104,9 @@ def resolve_train_settings(train_cfg: dict[str, Any], device: str) -> dict[str, 
     }
 
 
-def load_model_and_tokenizer(config: dict[str, Any], settings: dict[str, Any], device: str):
+def load_model_and_tokenizer(
+    config: dict[str, Any], settings: dict[str, Any], device: str, local_rank: int = -1
+):
     base_id = config["model"]["base_id"]
     tokenizer = AutoTokenizer.from_pretrained(base_id)
     if tokenizer.pad_token is None:
@@ -112,6 +115,10 @@ def load_model_and_tokenizer(config: dict[str, Any], settings: dict[str, Any], d
     kwargs: dict[str, Any] = {"dtype": settings["torch_dtype"]}
     if settings["quantization_config"] is not None:
         kwargs["quantization_config"] = settings["quantization_config"]
+        if local_rank >= 0:
+            # DDP (torchrun): every process loads the whole 4-bit model onto
+            # its own GPU. Without this both ranks land on cuda:0.
+            kwargs["device_map"] = {"": local_rank}
     if settings["attn_implementation"]:
         kwargs["attn_implementation"] = settings["attn_implementation"]
 
@@ -183,11 +190,15 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
     train_cfg = config["train"]
     method = train_cfg["method"]
     device = resolve_device()
+    # torchrun sets LOCAL_RANK; -1 means a plain single-process run.
+    local_rank = int(os.environ.get("LOCAL_RANK", -1))
+    if device == "cuda" and local_rank >= 0:
+        torch.cuda.set_device(local_rank)
     settings = resolve_train_settings(train_cfg, device)
     for note in settings["downgrade_notes"]:
         print(f"[device downgrade] {note}")
 
-    model, tokenizer = load_model_and_tokenizer(config, settings, device)
+    model, tokenizer = load_model_and_tokenizer(config, settings, device, local_rank)
     peft_config = None if isinstance(model, PeftModel) else build_lora_config(train_cfg)
 
     output_dir = train_cfg["output_adapter"]
@@ -344,7 +355,8 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
         "log_history": trainer.state.log_history,
         "output_adapter": output_dir,
     }
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    with open(Path(output_dir) / "run_report.json", "w") as f:
-        json.dump(report, f, indent=2, default=str)
+    if local_rank <= 0:  # single-process (-1) or DDP main (0) only
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        with open(Path(output_dir) / "run_report.json", "w") as f:
+            json.dump(report, f, indent=2, default=str)
     return report
