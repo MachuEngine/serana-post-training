@@ -1,8 +1,19 @@
 # 2x L4 DDP scaling run — plan
 
-**Status: proposal.** DESIGN.md §8 optional extension ("2x L4 DDP scaling
-run ... the honest multi-GPU demo"). Judge-free — GCP credit only, no
-OpenAI API.
+**Status: blocked on quota (increase request submitted 2026-09-02).**
+DESIGN.md §8 optional extension ("2x L4 DDP scaling run ... the honest
+multi-GPU demo"). Judge-free — GCP credit only, no OpenAI API.
+
+The project's L4 quota is capped at **1 GPU** in both places that gate a
+2x L4 instance: `NVIDIA_L4_GPUS` (asia-northeast3) and `GPUS_ALL_REGIONS`
+(global), the same two-layer cap flagged in P0. `g2-standard-24` (2x L4)
+cannot be created until both are raised to >= 2. A quota-increase request
+is in; GPU increases on a $300-trial project are often slow or denied,
+so this may not clear. The DDP code changes (`src/finetune/train.py`,
+committed) are ready either way — if the quota clears, this is a quick
+execution; if not, the honest portfolio note is "the multi-GPU demo was
+scoped, coded, and blocked by a hard L4 quota of 1", which is itself a
+real constraint (the same class as P4's L4 stockout).
 
 ## Goal
 
