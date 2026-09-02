@@ -1,0 +1,10 @@
+{
+  "n_prompts": 893,
+  "adapter": "artifacts/lora/serana-sft",
+  "replies_per_prompt": 4,
+  "temperature": 1.0,
+  "batch_size": 4,
+  "wall_clock_s": 3920.3,
+  "prompts_per_s": 0.228,
+  "peak_mem_gb": 18.674
+}

@@ -1,0 +1,31 @@
+{
+  "input": "data/ko/raw/reply_groups_v3.jsonl",
+  "n_groups": 893,
+  "replies_per_group": 4,
+  "funnel": {
+    "schema_error": 0,
+    "api_error": 0,
+    "best_equals_worst": 0,
+    "register": 4,
+    "near_duplicate": 0,
+    "low_confidence": 0,
+    "kept": 889
+  },
+  "confidence_of_valid_picks": {
+    "high": 888,
+    "medium": 5,
+    "low": 0,
+    "missing": 0
+  },
+  "register_check_vs_regex": {
+    "replies_checked": 3572,
+    "agree": 3428,
+    "judge_flagged_only": 141,
+    "regex_flagged_only": 3
+  },
+  "n_final_preference_pairs": 889,
+  "length_guard": {
+    "chosen_longer_frac": 0.412,
+    "mean_chosen_over_rejected_len": 1.015
+  }
+}

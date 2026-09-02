@@ -1,0 +1,22 @@
+# P4 redo (artifacts/runs/p4_dpo_redo_plan.md). Identical to dpo.yaml
+# except the data source and output path -- hyperparameters are
+# unchanged from P4 (beta/lr/epochs/grad_accum), so any difference in
+# outcome is attributable to the preference data and judge, not a
+# hyperparameter change. Continues the SFT adapter; reference model is
+# the same weights with the adapter disabled (train.ref_model: null in
+# base.yaml), not a second resident model. Writes to serana-dpo-v3, not
+# serana-dpo -- the shipped P4 adapter is left untouched until this run
+# either wins (then promote) or produces a null (then keep the original).
+name: serana-dpo-v3
+inherits: ../base.yaml
+train:
+  method: dpo                          # cpt | sft | dpo -- selects the trainer
+  init_adapter: artifacts/lora/serana-sft
+  data:
+    preference_file: data/ko/prefs_v3.jsonl
+  dpo:
+    beta: 0.1                          # KL strength -- the main knob (§3.4)
+    learning_rate: 5.0e-6               # ~1 order of magnitude below SFT (§3.4)
+    num_epochs: 1                       # DPO overfits preference sets quickly (§3.4)
+    grad_accum_steps: 8                 # DPO processes chosen+rejected (§3.5)
+  output_adapter: artifacts/lora/serana-dpo-v3

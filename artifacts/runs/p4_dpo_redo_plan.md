@@ -1,8 +1,12 @@
-# P4 DPO redo — plan (PROPOSAL, not yet approved)
+# P4 DPO redo — plan
 
-**Status:** proposal. Nothing here has run. OpenAI balance confirmed at
-$15.25 (enough — this plan needs ~$6 of API). GCP credit is not a
-constraint.
+**Status: executed (2026-09-01 to 09-02).** This document is the plan as
+written before the run. What actually happened, step by step, is in
+`p4redo_progress.md`; the outcome (a "two-level null" — training
+responded, eval quality did not move) is in `p4_postmortem.md` §6. The
+plan held up well: measured cost ~$2 GPU / ~$6 API vs the ~$1.5 / ~$5–6
+predicted; the only surprises were a 2× slow generation-throughput miss
+and flash-attn missing from the serving VM.
 
 **Why:** P4's DPO run was a corroborated null (`artifacts/runs/p4_postmortem.md`).
 Two causes were in reach without rebuilding the whole data pipeline:

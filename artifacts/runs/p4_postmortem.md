@@ -1,16 +1,20 @@
 # P4 postmortem: why DPO produced a null result
 
-Companion to `p4_progress.md` (which logs *what happened* during the DPO
-run) and `p5_progress.md` Stage 3 (which logs the eval comparison). This
+Companion to `p4_progress.md` (the first DPO run), `p5_progress.md` Stage
+3 (the eval comparison), and `p4redo_progress.md` (the redo). This
 document answers the one question a portfolio reviewer asks first: **DPO
-didn't beat SFT, so why not?** No new GPU work: this is analysis of
-artifacts that already exist (`run_report.json`, `p3_preference_report.json`,
-`eval_*.json`, `results_quality.md`, `p3_audit_report.json`,
-`judge_validation_report.json`).
+didn't beat SFT, so why not?**
 
-One line: **the preference pairs carried almost no learnable signal, so
-DPO training moved the policy by an amount indistinguishable from noise.
-This is not circularity, and it is not a beta-tuning problem.**
+Sections 1-5 analyse the first run from artifacts that already existed
+(`run_report.json`, `eval_*.json`, `p3_audit_report.json`, ...), no new
+GPU work. Section 6 covers the redo, which did rerun the preference
+pipeline and DPO training (~$2 GPU / ~$6 API).
+
+One line: **the first run's preference pairs carried almost no learnable
+signal; a redo with genuinely contrastive pairs made the training
+respond, and the eval-set quality still did not move versus SFT. Not
+circularity, not a beta-tuning problem — a real but small learned signal
+that the 30-prompt eval set cannot resolve.**
 
 ---
 
@@ -163,38 +167,83 @@ thing. This is a robust null, not an artifact.
 
 ---
 
-## 6. What would have been needed (and why we are not doing it)
+## 6. The redo, and the two-level null
 
-To give DPO a real chance at showing a delta:
+P4 left one question genuinely open: is the null here because the
+preference data gave DPO nothing to learn, or because DPO does not help
+this problem? Two of the three fixes above were in reach without a
+data-scale sweep, so the redo ran them (full log:
+`artifacts/runs/p4redo_progress.md`, plan:
+`artifacts/runs/p4_dpo_redo_plan.md`):
 
-1. **Higher-contrast pairs.** Sample one reply from `serana-sft` and one
-   from base **B** (or from a deliberately degraded prompt), so chosen
-   and rejected are genuinely far apart. This is a P3 redo.
-2. **A better preference judge.** A stronger model, an explicit
-   checklist rubric, and discarding low-confidence pairs.
-3. **More pairs.** 3k-10k rather than 837. Another data-pipeline pass.
+1. **Higher-contrast pairs, on-policy.** Sample **N=4** replies per
+   prompt from `serana-sft` at temperature 1.0 and take the judge's
+   best-vs-worst. Both replies still come from the model being trained
+   (unlike an SFT-vs-B pairing, which would be off-policy on the rejected
+   side), but selection over 4 samples manufactures real contrast. 889
+   pairs.
+2. **A stricter judge (v3).** Best/worst of N with a hard speech-level
+   gate returned as data, a confidence field, and an automated
+   cross-check of the judge's register call against the `rule_checks.py`
+   regex. A 30-pair by-eye check: disagree with the judge on ~3-6 of 30,
+   under the stop threshold.
 
-All three are out of scope for this portfolio (CLAUDE.md scope
-discipline: the experiment is deliberately minimal, and a DPO beta sweep
-/ data-scale sweep are explicitly cut). The honest move is to **report
-the null with its cause**, not to keep spending until DPO wins, which
-CLAUDE.md names directly.
+**What changed:** the DPO training *responded*. Per-step loss fell below
+ln(2), the reward margin turned sustainedly positive, and the held-out
+reward margin climbed 0.017 -> 0.026. The mechanism that was dead in P4
+was alive.
+
+**What did not change:** the eval-set quality. `serana-dpo-v3` vs SFT,
+every 95% CI overlaps — PCS 0.767 vs 0.800, PRS 0.900 vs 0.850,
+knowledge-boundary 0.900 vs 0.933. One concrete item moved (`roleexit01`:
+"그렇게 하자" -> "그게 무슨 뜻인지 모르겠어", held), which is the whole PRS
+point-estimate change and 1 of ~20 scored probes. Not promoted.
+
+So the null holds at a second level, and it is more informative than
+P4's:
+
+| | P4 | DPO-v3 (redo) |
+|---|---|---|
+| training responds? | no (loss pinned at ln 2) | yes (loss falls, margin separates) |
+| eval quality moves vs SFT? | no | still no |
+
+Why a real training signal did not become a measurable quality gain, in
+order of how much each likely matters:
+
+1. **The eval set cannot resolve a small gain.** 30 quality prompts, ~20
+   scored attack items, PCS CIs ~±0.15. DESIGN.md §4.5 said this going
+   in. This is the binding constraint.
+2. **The learned gain is small.** 889 pairs, 1 epoch: held-out reward
+   margin 0.017 -> 0.026.
+3. **The preference did not generalize.** Held-out binary preference
+   accuracy ended at ~0.69 (peaked 0.73 at step 25, drifted down while
+   train accuracy climbed -- mild overfitting). The model shifted
+   probability mass without learning to flip the decision on new pairs.
+4. **SFT is near the ceiling this eval set can see** (PCS 0.80, KB 0.93).
+
+More data (3k-10k pairs) could enlarge point 2, but point 1 -- eval-set
+resolution -- would still bind, and expanding the eval set is separate,
+out-of-scope work. More epochs would overfit. Per CLAUDE.md: report the
+null with its cause, do not keep spending until DPO wins.
 
 ---
 
 ## 7. Recommended framing for the README / blog
 
 > DPO produced a clean, corroborated null: no CI-confirmed change versus
-> SFT on any quality metric, and its one visible movement (knowledge
-> boundary) was slightly negative. The cause is visible in the training
-> log: per-step DPO loss never left ln(2), meaning the model never fit
-> the preference pairs even on the training set. The pairs carried almost
-> no learnable signal because both the chosen and the rejected reply were
-> sampled from the same already-narrow SFT distribution and differed only
-> cosmetically, and the AI judge labeling them agreed with human
-> annotators only about 70% of the time. This is not circularity, which
-> would have inflated the judge-scored metrics (it did not), and it is
-> not a KL-strength problem, which would still have moved the training
-> loss (it did not). It is the honest ceiling of RLAIF when the policy
-> you sample from has already converged and the judge is noisy. The
-> post-training gain in this project lives entirely at the B to SFT step.
+> SFT on any quality metric. In the first run the cause was visible in
+> the training log -- per-step loss never left ln(2), so the model never
+> fit the preference pairs even on the training set, because the chosen
+> and rejected replies were both sampled from the same already-narrow SFT
+> distribution and the AI judge labeling them agreed with humans only
+> ~70% of the time. A redo fixed both: sampling four replies per prompt
+> and taking the judge's best-vs-worst gives genuinely contrastive
+> on-policy pairs, and a stricter judge with a register gate and a
+> confidence filter. This time the training responded -- the loss fell,
+> the reward margin separated. And the eval-set quality still did not
+> move versus SFT. That is the more informative result: it is not that
+> DPO could not learn here, it is that a real learned preference signal,
+> on this persona and at this eval-set size, does not translate into a
+> measurable quality gain. This is not circularity (the judge metrics
+> did not inflate) and not a KL-strength problem (the loss moved). The
+> post-training gain in this project lives entirely at the B -> SFT step.
