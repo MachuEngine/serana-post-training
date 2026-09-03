@@ -1,19 +1,33 @@
-# 2x L4 DDP scaling run — plan
+# 2x L4 DDP scaling run — plan (BLOCKED: quota denied)
 
-**Status: blocked on quota (increase request submitted 2026-09-02).**
-DESIGN.md §8 optional extension ("2x L4 DDP scaling run ... the honest
-multi-GPU demo"). Judge-free — GCP credit only, no OpenAI API.
+**Status: scoped, coded, blocked — quota-increase request denied
+2026-09-03.** DESIGN.md §8 optional extension ("2x L4 DDP scaling run ...
+the honest multi-GPU demo"). Judge-free — GCP credit only, no OpenAI API.
 
 The project's L4 quota is capped at **1 GPU** in both places that gate a
 2x L4 instance: `NVIDIA_L4_GPUS` (asia-northeast3) and `GPUS_ALL_REGIONS`
 (global), the same two-layer cap flagged in P0. `g2-standard-24` (2x L4)
-cannot be created until both are raised to >= 2. A quota-increase request
-is in; GPU increases on a $300-trial project are often slow or denied,
-so this may not clear. The DDP code changes (`src/finetune/train.py`,
-committed) are ready either way — if the quota clears, this is a quick
-execution; if not, the honest portfolio note is "the multi-GPU demo was
-scoped, coded, and blocked by a hard L4 quota of 1", which is itself a
-real constraint (the same class as P4's L4 stockout).
+cannot be created until both are raised to >= 2.
+
+**Outcome:** the increase request was **denied** — Google Cloud Support:
+"we are unable to grant you additional quota at this time. If this is a
+new project please wait 48h ... or until your Billing account has
+additional history." This is the standard response for a young project
+on a trial-history billing account.
+
+So the demo does not run. What stands as the deliverable:
+- The DDP code path (`src/finetune/train.py` — `LOCAL_RANK` handling,
+  per-rank `device_map`, main-process-only report write) is committed and
+  ready; it would run if the quota ever clears (resubmit after 48h + more
+  billing history).
+- This plan document: the run was designed to completion (setup,
+  equivalence check, profiler method, cost, stop conditions) before the
+  quota wall.
+- The honest portfolio note: "the multi-GPU demo was scoped and coded;
+  it was blocked by a hard L4 quota of 1 that Google would not raise on
+  this project's billing history" — a real infrastructure constraint,
+  the same class as P4's L4 stockout, and worth stating plainly rather
+  than quietly dropping.
 
 ## Goal
 
