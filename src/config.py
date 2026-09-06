@@ -16,6 +16,7 @@ import yaml
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """override의 값으로 base를 덮어쓰되, 같은 키가 양쪽 다 dict면 그 안까지 재귀적으로 병합한다."""
     merged = dict(base)
     for key, value in override.items():
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
