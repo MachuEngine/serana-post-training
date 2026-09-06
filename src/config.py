@@ -27,9 +27,9 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
-    """Load a config file, resolving `inherits` chains. Returns a plain
-    dict with `inherits` removed -- the caller sees only the final,
-    merged config."""
+    """config 파일(.yaml)을 로드하고, 파이썬 dict으로 변환한다.
+    만약 inherits라는게 존재하면 지우고, 부모 경로를 통해 부모 config 파일도 재귀적으로 처리한다.
+    마지막으로 _deep_merge를 통해 하나로 합친다."""
     path = Path(path).resolve()
     with path.open() as f:
         data = yaml.safe_load(f) or {}
