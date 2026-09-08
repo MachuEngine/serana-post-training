@@ -102,6 +102,19 @@ quality 프롬프트 ~30개, 채점된 attack probe ~20개 규모라 대부분 C
 **LoRA adapter overhead:**
 LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7% 차이인데, 이 표본 크기에서는 실행별 노이즈 범위 안이다. DESIGN.md가 예상했던 "거의 0에 가까운 overhead"에 해당한다. post-training이 서빙 비용을 거의 늘리지 않고 품질을 사왔다는 뜻이다.
 
+**PPO 반사실(counterfactual) — "DPO를 골랐다"를 숫자로** (`scripts/ppo_vram_estimate.py`, GPU도 API도 안 씀):
+
+| | VRAM | 카드 대비 |
+|---|---|---|
+| PPO, 최대한 후하게 잡은 하한 | 22.32 GiB | 99% — 여유 0.18 GiB |
+| PPO, 현실적으로 | **26.06 GiB** | **116% — 안 들어감** |
+| DPO, 실측 | 15.00 GiB | 67% |
+| L4 실사용 가능 | 22.50 GiB | — |
+
+파라미터 수는 인용하지 않고 모델 config에서 직접 계산했다(linear 6.946B + embedding/head 1.245B = 8.190B로, MFU 작업에서 따로 확인해둔 6.95B/8.2B와 일치). 활성값 항은 종이 계산이 잘 안 맞는 부분이라 **추정하지 않고 SFT 실측 peak에서 역산**했고, 그렇게 만든 식을 **독립된 두 번째 측정으로 먼저 검증**한 다음에야 한 번도 돌려본 적 없는 구성에 적용했다(DPO 예측 17.12 GiB vs 실측 15.00, 오차 14.1%로 허용치 20% 이내). PPO에게는 이 프로젝트가 쓰는 모든 트릭을 그대로 줬다 — 4비트 양자화, LoRA, 어댑터 토글로 얻는 공짜 참조 모델.
+
+**숫자 하나가 아니라 범위로 적은 것은 의도적이다.** 학습 스텝 기준 활성값을 보상·참조 모델(둘 다 순전파만 하므로 중간값을 저장하지 않는다)에까지 물리면 33 GiB가 나오는데, 이는 결론에 유리한 쪽으로 부풀린 수치다. 정직한 버전은 "PPO에 가장 유리한 하한조차 여유가 0.18 GiB이고, 그건 들어간 게 아니다"이다.
+
 모든 GPU 단계의 예측-실측 전체 기록(`flash-attn`/torch ABI 충돌, Qwen3 thinking-mode 토큰 낭비 등 실제로 발견하고 고친 환경 버그 2건 포함)은 `artifacts/runs/p2_progress.md` … `p5_progress.md`에 있다.
 
 ---
@@ -118,7 +131,7 @@ LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7
 
 `Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI 호환 서버, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
 
-PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올려야 하는 VRAM 계산이 8B 모델을 24GB에 못 태운다(`DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다.
+PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올리면 **현실적으로 26.06 GiB, PPO에 최대한 유리하게 잡아도 22.32 GiB가 필요한데 L4의 실사용 가능 용량은 22.5 GiB다**(`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다 — 위 PPO 반사실 표 참고.
 
 ## 재현하기
 

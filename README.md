@@ -102,6 +102,19 @@ Throughput scales near-linearly from 1 to 8 (13 → 24 → 45 → 81 tok/s), the
 **LoRA adapter overhead:**
 ~7% between LoRA-on-base and the fully-merged model at matched concurrency, within run-to-run noise at this sample size. Reads as the near-zero overhead DESIGN.md anticipated: post-training bought quality at effectively no serving cost.
 
+**The PPO counterfactual — "I chose DPO" as a number** (`scripts/ppo_vram_estimate.py`, no GPU, no API):
+
+| | VRAM | share of the card |
+|---|---|---|
+| PPO, most generous bound | 22.32 GiB | 99% — 0.18 GiB spare |
+| PPO, realistic | **26.06 GiB** | **116% — does not fit** |
+| DPO, measured | 15.00 GiB | 67% |
+| L4 usable | 22.50 GiB | — |
+
+Parameter counts are derived from the model config rather than quoted (6.946B linear + 1.245B embeddings/head = 8.190B, agreeing with the 6.95B/8.2B figures the MFU work established separately). The activation term is the one a paper estimate gets wrong, so it is *calibrated* off the measured SFT peak rather than modelled — and the resulting model is then validated against an independent second measurement (predicted DPO 17.12 GiB vs measured 15.00, a 14.1% gap, inside the 20% tolerance) before being trusted for a configuration that was never run. PPO is given every trick this project already uses: 4-bit throughout, LoRA, reference by adapter toggle.
+
+Stated as a bound rather than one number on purpose. Charging the full trained-step activation term to the frozen reward and reference models — which only ever run inference — produces 33 GiB, a more flattering number that inflates the result in the direction of the conclusion. The honest version is that even the bound most generous to PPO leaves 0.18 GiB, which is not a fit.
+
 Full predicted-vs-measured trail for every GPU phase, including two real environment bugs found and fixed mid-run (a `flash-attn`/torch ABI break, Qwen3's thinking-mode token budget), is in `artifacts/runs/p2_progress.md` … `p5_progress.md`.
 
 ---
@@ -118,7 +131,7 @@ Full predicted-vs-measured trail for every GPU phase, including two real environ
 
 `Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI-compatible server, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
 
-PPO/reward-model RLHF is deliberately excluded: the VRAM arithmetic for policy + reference + reward + value simultaneously resident doesn't fit 8B on 24GB (`DESIGN.md` §7.1). That calculation is itself part of the deliverable.
+PPO/reward-model RLHF is deliberately excluded: policy + reference + reward + value simultaneously resident needs **26.06 GiB realistically, and 22.32 GiB even on the accounting most generous to PPO, against 22.5 GiB usable** on the L4 (`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). That calculation is itself part of the deliverable — see the PPO counterfactual table above.
 
 ## Reproducing
 

@@ -445,7 +445,7 @@ A deliverable, not a support function. The rule from CLAUDE.md — **predict, th
 
 ### 7.1 VRAM accounting: predict before you run
 
-Before the first training run of each stage, write the arithmetic in the run plan. `src/gpu/vram_estimate.py` implements it; the training script records `torch.cuda.max_memory_allocated()` at the end. Gaps beyond `gpu.vram_estimate_tolerance` require a written explanation.
+Before the first training run of each stage, write the arithmetic in the run plan; the training script records `torch.cuda.max_memory_allocated()` at the end. Gaps beyond `gpu.vram_estimate_tolerance` require a written explanation. The two arithmetic pieces that got their own scripts are `scripts/kv_cache_estimate.py` (§7.4 serving) and `scripts/ppo_vram_estimate.py` (the counterfactual below); the per-stage training estimates live in the run plans and `artifacts/runs/p*_progress.md`, not in a shared module.
 
 | Term | Estimate |
 |------|----------|
@@ -458,7 +458,7 @@ Before the first training run of each stage, write the arithmetic in the run pla
 
 Deliverables:
 - A predicted-vs-measured VRAM table for CPT, SFT, DPO, and serving.
-- **The PPO counterfactual.** Run the same arithmetic for policy + frozen reference + reward model + value head and show the number exceeds 24GB. This converts "I chose DPO" into "PPO needed N GB and I had 24."
+- **The PPO counterfactual — done, `scripts/ppo_vram_estimate.py`** (no GPU, no API). Parameter counts are derived from the model config rather than quoted (6.946B linear + 1.245B embeddings/head = 8.190B, agreeing with the 6.95B/8.2B figures §7.3's MFU work established separately); the activation term is calibrated off P2's measured SFT peak instead of modelled, per the "measure once and carry the number" row above; and the resulting model is validated against P4's measured DPO peak (predicted 17.12 GiB vs measured 15.00, 14.1% gap, inside the 20% tolerance) before being trusted for a config never run. Giving PPO every trick this project already uses — 4-bit throughout, LoRA, reference by adapter toggle — the unavoidably resident weights plus rollout KV cache come to **18.58 GiB**, and with activations **22.32 GiB on the most generous bound** (99% of the card, 0.18 GiB spare: no room for the optimizer step, fragmentation, or a sequence past `max_seq_len`) and **26.06 GiB realistically** (1.16× the card) against 22.5 GiB usable. Measured DPO: **15.00 GiB**. Reported as a bound, not a single number, on purpose — charging the full trained-step activation term to the frozen reward and reference models, which only ever run inference, yields 33 GiB and would inflate the result in the direction of the conclusion.
 - **The DPO reference-model check.** Measured DPO peak ≈ SFT peak is the proof of the §3.4 claim.
 - Note that r appears in this arithmetic, so the §3.6d rank comparison and this section share a number — report them together.
 
