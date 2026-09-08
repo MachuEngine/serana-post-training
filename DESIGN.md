@@ -197,6 +197,7 @@ Four metrics, two DPO guards, one judge validation. Hardware metrics are in §7.
 - Frozen as `eval_set_vN`. Never overlaps CPT text, SFT data, the val split, or the DPO prompt pool.
 - 24 probes is deliberate: enough for a per-category breakdown, small enough to hand-write carefully.
 - 50 human labels is the floor for a usable Spearman estimate and the most tedious manual step. Do it once, in P1, in one sitting.
+- **v2 (optional, `artifacts/runs/p8_plan.md`):** the paired re-analysis (§4.5) showed 30 prompts can't resolve any stage delta, so `eval_set_v2` scales to 150 quality prompts + 60 scored attack items, authored against a discrimination target, and re-scores B/SFT/DPO alongside. v1 and its shipped tables are untouched; `paths.eval_set` still resolves to v1. Judge for v2 is `gpt-4o-mini` (validated at Spearman 0.81 on the same 50 v1 labels, `config/eval.yaml judge_v2`).
 
 ### 4.2 Persona quality metrics
 
@@ -245,6 +246,7 @@ Publishing these unprompted is the point — it shows you knew the failure mode 
 
 - Report every quality metric as **mean ± 95% CI** (bootstrap over eval prompts, ≥ 1,000 resamples). With ~30 prompts the CIs will be wide — that is the honest picture at this eval-set size.
 - Call a difference **real only if the 95% CIs don't overlap**. Otherwise "no measurable difference," which is itself a finding.
+- **Sharper test for two configs on the same prompts:** a **paired bootstrap** of the per-prompt score difference (`paired_bootstrap_diff`, run by `scripts/paired_analysis.py` on the stored per-item judge scores — no GPU/API). Per-prompt difficulty cancels, so its CI is tighter than the CI-overlap check. Non-overlapping independent CIs still imply a real difference; overlapping ones do **not** imply no difference — the paired test may still resolve one. Run it on the raw 1–5 judge score, not the 0/1 violation collapse. Applied to B→SFT→DPO it confirms the DPO null (P4 run *and* the v3 redo — every paired CI brackets zero, `artifacts/runs/paired_analysis.md`) and does not resolve B→SFT on PCS/PRS/boundary either: those judge metrics are near-saturated at this eval-set size, and the B→SFT gain lives in the non-CI-gated measurements (reply length 150→23 tokens, style similarity, distinct-2, the smoke-test voice change).
 - **Eval decoding is greedy** (`temperature: 0.0`) — deterministic, single-run, no seed budget. Separate from preference-pair generation (§3.4), which samples deliberately.
 - Quantization, `max_model_len`, `max_num_seqs`, and the base model are shared constants across configs.
 - A metric at a suspicious extreme is treated as a leak/bug until verified against §4.6 — and you will know what that looks like, having induced one in §3.6b.

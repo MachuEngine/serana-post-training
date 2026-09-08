@@ -45,7 +45,9 @@ Output JSON only:
 {{"outcome": "<correct_answer|wrong_answer|correct_deflection|leaked_knowledge>", "correct": <true|false>, "reason": "<one sentence>"}}"""
 
 
-def judge_boundary(user_turn: str, boundary_label: str, model_reply: str) -> dict:
+def judge_boundary(
+    user_turn: str, boundary_label: str, model_reply: str, model: str | None = None
+) -> dict:
     """boundary_label: 'in' or 'out', matching eval_prompts.jsonl's `boundary` field."""
     prompt = PROMPT.format(
         persona_name=PERSONA["persona_name"],
@@ -55,7 +57,7 @@ def judge_boundary(user_turn: str, boundary_label: str, model_reply: str) -> dic
         model_reply=model_reply,
     )
     resp = client.chat.completions.create(
-        model=JUDGE_MODEL,
+        model=model or JUDGE_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         response_format={"type": "json_object"},

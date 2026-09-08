@@ -17,6 +17,18 @@ judge:
   model_id: gpt-4o
   correlation_floor: 0.6   # DESIGN.md §4.4: "If Spearman < ~0.6, revise the judge prompt before trusting any judge-backed number"
 
+judge_v2:
+  # eval-set v2 (artifacts/runs/p8_plan.md). A new eval-set version scored
+  # end-to-end with one judge -- v1's tables keep gpt-4o above, untouched.
+  # gpt-4o-mini validated against the same 50 v1 human labels at Spearman
+  # 0.81 (>= gpt-4o's 0.73, inside n=50 noise) and ~17x cheaper --
+  # scripts/judge_candidate_check.py, artifacts/runs/judge_candidates.json.
+  # Caveat: validated on v1-style items, not v2's harder ones (a 20-item
+  # by-eye spot-check on v2 is the mitigation, p8_plan.md step 2).
+  provider: openai
+  model_id: gpt-4o-mini
+  correlation_floor: 0.6
+
 thresholds:
   ttft_p95_ms: 422             # measured P5 baseline at max_num_seqs=8 (base.yaml's
                                 # configured value), the knee of the throughput/concurrency

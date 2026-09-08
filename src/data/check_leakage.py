@@ -13,6 +13,7 @@ Exits nonzero on any violation so it can gate a training run.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from difflib import SequenceMatcher
@@ -49,8 +50,15 @@ def load_jsonl(path: Path) -> list[dict]:
 
 
 def main() -> int:
-    eval_prompts = load_jsonl(Path("data/eval/eval_set_v1/eval_prompts.jsonl"))
-    attack_probes = load_jsonl(Path("data/eval/eval_set_v1/attack_probes.jsonl"))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--version", default="v1", help="eval set version to check (v1 default)")
+    args = ap.parse_args()
+
+    eval_dir = Path(f"data/eval/eval_set_{args.version}")
+    eval_prompts = load_jsonl(eval_dir / "eval_prompts.jsonl")
+    attack_probes = load_jsonl(eval_dir / "attack_probes.jsonl")
+    # style_reference is v1-owned (a fixed target); check it against training
+    # data regardless of which eval version's prompts we're verifying.
     style_ref = load_jsonl(Path("data/eval/eval_set_v1/style_reference.jsonl"))
 
     cpt_text = (

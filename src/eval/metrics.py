@@ -47,6 +47,50 @@ def cis_overlap(a: dict, b: dict) -> bool:
     return a["ci_low"] <= b["ci_high"] and b["ci_low"] <= a["ci_high"]
 
 
+def paired_bootstrap_diff(
+    a_values: list[float],
+    b_values: list[float],
+    n_resamples: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 0,
+) -> dict:
+    """Paired bootstrap of the per-item difference a_i - b_i (DESIGN.md §4.5).
+
+    `a_values[i]` and `b_values[i]` must be the same eval item scored under
+    two configs -- the caller aligns them by item id. Each resample draws the
+    per-item *differences* with replacement, which is the same as drawing one
+    item-index set and applying it to both configs: per-item difficulty
+    cancels, so this CI is tighter than comparing two independent
+    `bootstrap_ci` runs with `cis_overlap`. Use it on the raw 1-5 judge score
+    (not the 0/1 violation collapse) where the extra resolution shows.
+
+    Returns the mean paired difference, its 95% CI, and whether that CI
+    excludes zero -- a difference the eval set can actually resolve.
+    """
+    if len(a_values) != len(b_values):
+        raise ValueError("a_values and b_values must be the same length (paired)")
+    if not a_values:
+        raise ValueError("values must be non-empty")
+    n = len(a_values)
+    diffs = [a_values[i] - b_values[i] for i in range(n)]
+    rng = random.Random(seed)
+    means = []
+    for _ in range(n_resamples):
+        means.append(sum(diffs[rng.randrange(n)] for _ in range(n)) / n)
+    means.sort()
+    lo_idx = int((alpha / 2) * n_resamples)
+    hi_idx = int((1 - alpha / 2) * n_resamples) - 1
+    ci_low = means[max(lo_idx, 0)]
+    ci_high = means[min(hi_idx, n_resamples - 1)]
+    return {
+        "diff_mean": sum(diffs) / n,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "n": n,
+        "excludes_zero": ci_low > 0 or ci_high < 0,
+    }
+
+
 def pcs(items: list[dict]) -> dict:
     """items: [{"breaks_register": bool, "admits_ai": bool, "judge_violation": bool}, ...]
     DESIGN.md §4.2: PCS = 1 - (violations/total). violation = union of the

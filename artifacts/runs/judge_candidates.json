@@ -1,0 +1,47 @@
+{
+  "baseline": {
+    "n": 50,
+    "spearman": 0.7338,
+    "exact_agreement": 0.62,
+    "within_1_agreement": 0.94,
+    "violation_flag_agreement": 0.92,
+    "correlation_floor": 0.6,
+    "passes_floor": true
+  },
+  "floor": 0.6,
+  "candidates": [
+    {
+      "model": "gpt-4o-mini",
+      "n": 50,
+      "spearman": 0.8125,
+      "exact_agreement": 0.66,
+      "within_1_agreement": 0.96,
+      "violation_flag_agreement": 0.92,
+      "passes_floor": true,
+      "mean_in_tok": 996,
+      "mean_out_tok": 42
+    },
+    {
+      "model": "gpt-4.1-mini",
+      "n": 50,
+      "spearman": 0.8167,
+      "exact_agreement": 0.64,
+      "within_1_agreement": 0.94,
+      "violation_flag_agreement": 0.9,
+      "passes_floor": true,
+      "mean_in_tok": 996,
+      "mean_out_tok": 43
+    },
+    {
+      "model": "gpt-5-mini",
+      "n": 50,
+      "spearman": 0.7817,
+      "exact_agreement": 0.68,
+      "within_1_agreement": 0.94,
+      "violation_flag_agreement": 0.94,
+      "passes_floor": true,
+      "mean_in_tok": 995,
+      "mean_out_tok": 503
+    }
+  ]
+}

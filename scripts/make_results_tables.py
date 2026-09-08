@@ -16,12 +16,14 @@ Writes: `artifacts/runs/results_quality.md`, `artifacts/runs/results_hardware.md
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.eval.eval_set import artifact_name, style_reference_lines
 from src.eval.metrics import (
     bootstrap_ci,
     distinct_n,
@@ -34,8 +36,7 @@ from src.eval.metrics import (
 from src.eval.style_similarity import style_embedding_similarity
 
 RUNS_DIR = Path("artifacts/runs")
-EVAL_SET_DIR = Path("data/eval/eval_set_v1")
-CONFIGS = ["b", "sft", "dpo"]
+CONFIGS = {"v1": ["b", "sft", "dpo"], "v2": ["b", "sft", "dpo", "dpo_v3"]}
 
 
 def load_eval_run(path: Path) -> dict:
@@ -154,38 +155,40 @@ def render_hardware_table(entries: list[dict]) -> str:
 
 
 def main() -> None:
-    style_reference = [
-        json.loads(line)["line"] for line in (EVAL_SET_DIR / "style_reference.jsonl").open()
-    ]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--eval-version", default="v1", help="v1 (default, shipped) or v2")
+    ap.add_argument("--configs", nargs="+", help="override the config list for this version")
+    args = ap.parse_args()
+
+    style_reference = style_reference_lines(args.eval_version)
+    configs = args.configs or CONFIGS.get(args.eval_version, CONFIGS["v1"])
+    suffix = "" if args.eval_version == "v1" else f"_{args.eval_version}"
 
     rows = []
-    for config in CONFIGS:
-        path = RUNS_DIR / f"eval_{config}.json"
+    for config in configs:
+        path = RUNS_DIR / f"{artifact_name('eval', config, args.eval_version)}.json"
         if not path.exists():
             print(f"skip {config}: {path} not found yet")
             continue
         rows.append(quality_row(load_eval_run(path), style_reference))
 
+    quality_md = RUNS_DIR / f"results_quality{suffix}.md"
     if rows:
-        (RUNS_DIR / "results_quality.md").write_text(render_quality_table(rows))
-        print(f"wrote {RUNS_DIR / 'results_quality.md'} ({len(rows)} config rows)")
+        quality_md.write_text(render_quality_table(rows))
+        print(f"wrote {quality_md} ({len(rows)} config rows)")
     else:
-        print(
-            "no eval run data found yet -- quality table not written "
-            "(Stage 3 produces artifacts/runs/eval_<config>.json)"
-        )
+        print(f"no eval run data found for {args.eval_version} -- {quality_md} not written")
 
-    hardware_entries = []
-    for path in sorted(RUNS_DIR.glob("hardware_*.json")):
-        hardware_entries.append(json.loads(path.read_text()))
-    if hardware_entries:
-        (RUNS_DIR / "results_hardware.md").write_text(render_hardware_table(hardware_entries))
-        print(f"wrote {RUNS_DIR / 'results_hardware.md'} ({len(hardware_entries)} entries)")
-    else:
-        print(
-            "no hardware run data found yet -- hardware table not written "
-            "(Stage 2/4 produce artifacts/runs/hardware_<label>.json)"
-        )
+    # Hardware table is eval-version-independent; only the default pass owns it.
+    if args.eval_version == "v1":
+        hardware_entries = [
+            json.loads(p.read_text()) for p in sorted(RUNS_DIR.glob("hardware_*.json"))
+        ]
+        if hardware_entries:
+            (RUNS_DIR / "results_hardware.md").write_text(render_hardware_table(hardware_entries))
+            print(f"wrote {RUNS_DIR / 'results_hardware.md'} ({len(hardware_entries)} entries)")
+        else:
+            print("no hardware run data found yet -- results_hardware.md not written")
 
 
 if __name__ == "__main__":

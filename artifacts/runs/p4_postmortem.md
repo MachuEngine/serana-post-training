@@ -161,9 +161,20 @@ artifact. Here every independent channel agrees:
 | distinct-2 / reply length | pure string metrics | unchanged |
 | PRS failure breakdown | regex rule-checks (no LLM) | identical ({exits_role: 1, none: 2}) |
 | knowledge-boundary acc | LLM judge (rubric B) | 0.933 -> 0.867 (down) |
+| paired-diff bootstrap (PCS 1-5, same 30 prompts) | resampling, no judge call | +0.033, 95% CI [+0.000, +0.100] -- brackets zero |
 
 Five of these do not involve an LLM judge at all. They all say the same
 thing. This is a robust null, not an artifact.
+
+**Paired re-analysis (`scripts/paired_analysis.py`, `artifacts/runs/paired_analysis.md`).**
+The shipped table compares configs with two independent CIs and the
+overlap test, which is weak. Re-running SFT->DPO as a *paired* bootstrap of
+the per-prompt score difference (per-prompt difficulty cancels, so the CI
+is much tighter) does not change the verdict: on the 1-5 PCS score the
+paired diff is +0.033 with a 95% CI of [+0.00, +0.10], and on the 0/1
+good-item and PRS rates it is exactly +0.000 with a CI of [0, 0] -- P4's
+DPO was very nearly a no-op prompt for prompt. The sharper test makes the
+null *more* defensible, not less.
 
 ---
 
@@ -206,13 +217,22 @@ P4's:
 |---|---|---|
 | training responds? | no (loss pinned at ln 2) | yes (loss falls, margin separates) |
 | eval quality moves vs SFT? | no | still no |
+| paired-diff test (sharper than CI-overlap) | null holds, PCS diff CI [+0.00, +0.10] | null holds, PCS diff CI [-0.07, +0.20] |
 
 Why a real training signal did not become a measurable quality gain, in
 order of how much each likely matters:
 
 1. **The eval set cannot resolve a small gain.** 30 quality prompts, ~20
    scored attack items, PCS CIs ~±0.15. DESIGN.md §4.5 said this going
-   in. This is the binding constraint.
+   in. This is the binding constraint. The paired re-analysis
+   (`artifacts/runs/paired_analysis.md`) puts a number on how binding: the
+   paired test is ~2x sharper than CI-overlap and it does not resolve
+   *B->SFT* on PCS/PRS/boundary either (PCS paired diff +0.33, CI
+   [-0.10, +0.80]). Those judge metrics are near-saturated at this
+   eval-set size -- the whole B->SFT gain shows up in reply length
+   (150->23 tokens), style similarity, distinct-2 and the smoke test, not
+   in the CI-gated scores. A DPO-vs-SFT delta was never going to clear a
+   bar that the much larger B->SFT delta doesn't.
 2. **The learned gain is small.** 889 pairs, 1 epoch: held-out reward
    margin 0.017 -> 0.026.
 3. **The preference did not generalize.** Held-out binary preference
