@@ -99,8 +99,6 @@ Deliberately **not** in the stack: ChromaDB, LangChain, retrieval of any kind, R
 
 **Model-agnostic by design.** No hardcoded model id anywhere; swapping the base model is a one-line config change. This is also what makes the local sandbox possible — the same code path runs 0.6B on the M5 and 8B on the L4.
 
-**Hard constraint:** compute and data stay in `kr-west`. No code path ships data outside the region except text-only calls to the judge/translation API. (`kr-west` = GCP `asia-northeast3`.)
-
 **VRAM is the binding constraint — and the subject matter.** Every VRAM-affecting decision must be justified in arithmetic, before the run (DESIGN.md §7.1). If something does not fit, shrink the model via `config/`. **An OOM is a config problem and a prediction failure — log both the fix and why the estimate was wrong.** Do not reach for a bigger GPU.
 
 **Budget constraint (GCP $300 welcome credit).** Binding on design:
