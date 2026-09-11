@@ -217,6 +217,12 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
         learning_rate=train_cfg.get("learning_rate", 2e-4),
         optim=settings["optim"],
         gradient_checkpointing=train_cfg.get("gradient_checkpointing", True),
+        # 재진입(reentrant) 방식 체크포인팅은 역전파 때 순전파를 다시 돌면서
+        # DDP가 심어둔 기울기 수집 훅을 건너뛴다. 그러면 한 랭크의 all-reduce가
+        # 영원히 대기하다 NCCL 워치독 타임아웃으로 죽는다(RunPod 2xL4에서 재현).
+        # 단일 GPU 경로는 이 설정에 영향받지 않는다.
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        ddp_find_unused_parameters=False,
         eval_strategy="steps" if train_cfg.get("val_split", 0) > 0 else "no",
         eval_steps=train_cfg.get("eval_steps", 25),
         logging_steps=5,
