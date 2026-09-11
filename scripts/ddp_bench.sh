@@ -21,14 +21,8 @@ COMMON=(--config config/train_runs/sft.yaml
         --set train.attn_implementation=sdpa
         --set "train.max_steps=$STEPS")
 
-echo "=== 1-GPU bf16, $STEPS steps ==="
-S=$(date +%s)
-CUDA_VISIBLE_DEVICES=0 .venv/bin/python scripts/train.py "${COMMON[@]}" \
-  --set train.output_adapter=artifacts/diagnostics/bf16_1gpu \
-  > "$R/bf16_1gpu.log" 2>&1 || { echo "1-GPU FAILED"; tail -25 "$R/bf16_1gpu.log"; exit 1; }
-E1=$(( $(date +%s) - S ))
-echo "1-GPU total ${E1}s"
-
+# 2-GPU를 먼저 돌린다. DDP가 깨지면 2분 안에 드러나므로, 긴 1-GPU 기준선에
+# 시간을 쓰기 전에 중단할 수 있다(반대 순서면 실패를 50분 뒤에야 안다).
 echo "=== 2-GPU bf16 DDP, $STEPS steps ==="
 S=$(date +%s)
 .venv/bin/torchrun --nproc_per_node=2 scripts/train.py "${COMMON[@]}" \
@@ -37,6 +31,14 @@ S=$(date +%s)
   > "$R/bf16_2gpu.log" 2>&1 || { echo "2-GPU FAILED"; tail -25 "$R/bf16_2gpu.log"; exit 1; }
 E2=$(( $(date +%s) - S ))
 echo "2-GPU total ${E2}s"
+
+echo "=== 1-GPU bf16, $STEPS steps ==="
+S=$(date +%s)
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python scripts/train.py "${COMMON[@]}" \
+  --set train.output_adapter=artifacts/diagnostics/bf16_1gpu \
+  > "$R/bf16_1gpu.log" 2>&1 || { echo "1-GPU FAILED"; tail -25 "$R/bf16_1gpu.log"; exit 1; }
+E1=$(( $(date +%s) - S ))
+echo "1-GPU total ${E1}s"
 
 python3 - "$E1" "$E2" "$STEPS" <<'PY' | tee "$R/ddp_summary.txt"
 import sys
