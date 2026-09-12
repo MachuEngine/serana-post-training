@@ -1,0 +1,4 @@
+1-GPU  27.63 s/step   (4145s / 150)
+2-GPU  15.46 s/step   (2319s / 150)
+speedup     1.79x   (ideal 2.00x)
+efficiency  89.4%
