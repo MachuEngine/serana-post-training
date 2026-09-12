@@ -44,6 +44,14 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/python scripts/train.py "${COMMON[@]}" \
 E1=$(( $(date +%s) - S ))
 echo "1-GPU total ${E1}s"
 
+# 손실 곡선의 정식 출처는 터미널 로그가 아니라 run_report.json의 log_history다.
+# 터미널 로그에는 tqdm 진행 표시줄이 캐리지 리턴으로 섞여 들어와 기록이
+# 덮어써진다(첫 측정에서 2-GPU의 스텝 5~25 구간을 이렇게 잃었다).
+for T in 1gpu 2gpu; do
+  cp "artifacts/diagnostics/bf16_$T/run_report.json" "$R/report_$T.json" 2>/dev/null \
+    || echo "WARN: bf16_$T의 run_report.json 없음 (완주 전에 중단된 실행)"
+done
+
 python3 - "$E1" "$E2" "$STEPS" <<'PY' | tee "$R/ddp_summary.txt"
 import sys
 e1, e2, n = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
