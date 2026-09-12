@@ -12,6 +12,7 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 STEPS="${1:-40}"
+MODEL="${2:-}"   # 로컬 모델 디렉터리. 비우면 config의 base_id(HF)를 쓴다.
 R=/workspace/results
 mkdir -p "$R" artifacts/diagnostics
 
@@ -20,6 +21,9 @@ COMMON=(--config config/train_runs/sft.yaml
         --set train.load_in_4bit=false
         --set train.attn_implementation=sdpa
         --set "train.max_steps=$STEPS")
+# HuggingFace가 RunPod IP 대역에 429를 걸어 가중치를 받을 수 없을 때가 있다.
+# 그럴 땐 ModelScope에서 받은 로컬 디렉터리를 두 번째 인자로 넘긴다.
+[ -n "$MODEL" ] && COMMON+=(--set "model.base_id=$MODEL")
 
 # 2-GPU를 먼저 돌린다. DDP가 깨지면 2분 안에 드러나므로, 긴 1-GPU 기준선에
 # 시간을 쓰기 전에 중단할 수 있다(반대 순서면 실패를 50분 뒤에야 안다).
