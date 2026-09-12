@@ -1,8 +1,12 @@
-# 2x L4 DDP scaling run — plan (BLOCKED: quota denied)
+# 2x L4 DDP scaling run — plan (DONE, on RunPod)
 
-**Status: scoped, coded, blocked — quota-increase request denied
-2026-09-03.** DESIGN.md §8 optional extension ("2x L4 DDP scaling run ...
-the honest multi-GPU demo"). Judge-free — GCP credit only, no OpenAI API.
+**Status: RUN AND MEASURED 2026-09-12. Results: `p7_ddp_result.md`.**
+This document is the plan as written before the run; it is kept as-is
+below so the predictions can be read against the measurements. The GCP
+route stayed blocked (quota auto-denied in all 19 L4 regions, not just
+the one retry recorded below), so the run happened on RunPod instead.
+
+DESIGN.md §7.6 now carries the result; §8 lists this extension as done.
 
 The project's L4 quota is capped at **1 GPU** in both places that gate a
 2x L4 instance: `NVIDIA_L4_GPUS` (asia-northeast3) and `GPUS_ALL_REGIONS`

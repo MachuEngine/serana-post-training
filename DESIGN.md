@@ -497,9 +497,26 @@ The interview value is being able to say *"gradient checkpointing cost me X% ste
 
 Preemption is guaranteed on Spot, so treat recovery as a designed capability. Deliverables: the preemption event in the run log, the resumed loss curve showing continuity across the gap, and the wall-clock overhead of the restart.
 
-### 7.6 What this section deliberately excludes
+### 7.6 Multi-GPU scaling, measured (DDP)
 
-Custom CUDA/Triton kernels, FSDP/DeepSpeed sharding, tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the other two are unnecessary when a 4-bit 8B fits one card. If multi-GPU is wanted, plain DDP on 2× L4 (§8) is the honest version.
+Done, on RunPod rather than GCP — the L4 quota request was auto-denied in all 19 regions that offer the card. Full write-up and raw reports: `artifacts/runs/p7_ddp_result.md`. Both legs ran 150 steps on one machine with global batch held at 16 (1-GPU: accum 16; 2-GPU: accum 8 × 2 ranks), so GPU count is the only variable.
+
+| basis | 1-GPU | 2-GPU | speedup | efficiency |
+|---|---|---|---|---|
+| pure training step | 26.39 s | 13.31 s | **1.98×** | **99.1%** |
+| end-to-end wall clock | 27.63 s | 15.46 s | 1.79× | 89.4% |
+
+Report both, because the gap is the finding: fixed cost that does not shrink with GPU count is **187 s on one GPU against 323 s on two** — each rank loads its own 16.4 GB copy, and the two reads contend on the same volume. Per-GPU peak VRAM 19.31 / 19.37 GB.
+
+**The 99% is a fact about LoRA, not about DDP.** Only the adapter's ~18.9M parameters (0.23% of 8.2B) are all-reduced, so a step moves ~38 MB against 13 s of compute — communication cannot be the bottleneck. Full fine-tuning would move ~16 GB per step and would not look like this. Quote the number with that premise attached.
+
+**Equivalence check passed** (§8's criterion): all 30 logged steps overlap, max absolute difference 0.0072 and mean 0.0011 on a loss spanning 0.09–2.52. The 2-GPU run is the same training split across ranks, not a larger-batch experiment. Table: `artifacts/runs/ddp_equivalence.md`.
+
+One environment caveat worth carrying: the run needs `NCCL_P2P_DISABLE=1`. Without it the first all-reduce hangs forever even though NCCL initialises and reports its P2P channels as connected — the tell is power draw, 31–35 W of 72 W while pinned at 100% utilization, against 67–73 W when actually training.
+
+### 7.7 What this section deliberately excludes
+
+Custom CUDA/Triton kernels, FSDP/DeepSpeed sharding, tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the other two are unnecessary when a 4-bit 8B fits one card. Plain DDP on 2× L4 (§7.6) is the honest multi-GPU version, and it is done.
 
 ---
 
@@ -509,7 +526,7 @@ None are deliverables. Listed with real cost.
 
 | Extension | Cost | Value |
 |-----------|------|-------|
-| **2× L4 DDP scaling run** (`g2-standard-24`, spot, one short SFT run) | ~3 GPU-h, ~$3 | Multi-GPU done honestly: report scaling efficiency (speedup ÷ 2) and where the gap goes. Recommended first |
+| ~~**2× L4 DDP scaling run**~~ — **DONE**, see §7.6 | ~$11 actual (RunPod; GCP quota denied in all 19 L4 regions) | 1.98× / 99.1% on the training step, 1.79× end to end, equivalence check passed |
 | **DPO β sweep** (0.05 / 0.1 / 0.3) | +2 runs, ~8 GPU-h | Shows you understand the KL-strength tradeoff |
 | **CPT as a fourth eval config** | +1 eval pass, ~5 GPU-h | Isolates CPT's contribution instead of folding it into SFT |
 | **Multi-turn length check** (1 / 3 / 10 turns) | Eval-only, a few GPU-h | Persona drift as context grows |

@@ -94,6 +94,18 @@ Full per-category PRS breakdown and per-prompt data: `artifacts/runs/results_qua
 **Throughput-vs-concurrency knee, exactly at the configured `max_num_seqs=8`:**
 Throughput scales near-linearly from 1 to 8 (13 → 24 → 45 → 81 tok/s), then completely flatlines at 16 (80.9 tok/s) while TTFT p50 explodes 10× (0.213s → 2.268s). The config value is validated by data, not assumed.
 
+**Two L4s instead of one** (DDP, global batch held at 16 so GPU count is the only variable — full write-up in [`artifacts/runs/p7_ddp_result.md`](artifacts/runs/p7_ddp_result.md)):
+
+| basis | 1× L4 | 2× L4 | speedup | efficiency |
+|---|---|---|---|---|
+| pure training step | 26.39s | 13.31s | **1.98×** | **99.1%** |
+| end-to-end wall clock | 27.63s | 15.46s | 1.79× | 89.4% |
+
+- Both are reported because the gap is the point: fixed cost that doesn't shrink with GPU count is **187s on one GPU vs 323s on two** — each rank loads its own 16.4GB copy and the two reads contend.
+- **The 99% is a fact about LoRA, not about DDP.** Only the adapter's ~18.9M parameters (0.23% of 8.2B) are all-reduced, so a step moves ~38MB against 13s of compute. Full fine-tuning would move ~16GB per step and would not look like this.
+- **Equivalence check passed:** all 30 logged steps overlap, max absolute difference 0.0072 on a loss spanning 0.09–2.52. The 2-GPU run is the same training split across ranks, not a bigger-batch experiment.
+- Needed `NCCL_P2P_DISABLE=1` — without it the first all-reduce hangs forever while NCCL still reports its P2P channels as connected. The tell is power draw: 31–35W of 72W at 100% "utilization", against 67–73W when actually training.
+
 **AWQ vs bf16** (same merged weights, quantization isolated from the adapter question):
 - 2.44× throughput, 2.7× faster TTFT p50.
 - **No PCS loss** (0.767 vs 0.800, CIs overlap).

@@ -1,0 +1,10 @@
+{
+  "label": "SFT training, 2x L4 DDP (same run, NCCL_P2P_DISABLE=1)",
+  "predicted_vram_gb": "~19 GB/GPU",
+  "measured_vram_gb": "19.37 GB/GPU",
+  "step_time_or_ttft": "13.31 s/step training, 15.46 s/step end-to-end",
+  "gpu_util_pct": "100",
+  "mfu_pct": "-",
+  "throughput": "1.98x speedup / 99.1% efficiency (1.79x / 89.4% end-to-end)",
+  "cost_usd": "-"
+}
