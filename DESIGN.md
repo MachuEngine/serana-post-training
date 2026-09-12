@@ -508,7 +508,16 @@ Done, on RunPod rather than GCP — the L4 quota request was auto-denied in all 
 | pure training step | 26.39 s | 13.31 s | **1.98×** | **99.1%** |
 | end-to-end wall clock | 27.63 s | 15.46 s | 1.79× | 89.4% |
 
-Report both, because the gap is the finding: fixed cost that does not shrink with GPU count is **187 s on one GPU against 323 s on two** — each rank loads its own 16.4 GB copy, and the two reads contend on the same volume. Per-GPU peak VRAM 19.31 / 19.37 GB.
+Report both, because the gap is the finding: fixed cost that does not shrink with GPU count is **187 s on one GPU against 323 s on two** — each rank loads its own 16.4 GB copy, and the two reads contend on the same volume.
+
+| | 1-GPU | 2-GPU |
+|---|---|---|
+| samples/s | 0.606 | 1.202 |
+| tokens/s | 539 | 1,069 |
+| **MFU (per GPU)** | **21.9%** | **21.7%** |
+| peak VRAM per GPU | 19.31 GB | 19.37 GB |
+
+MFU by §7.3's convention (`6 × N_params × tokens / wall_seconds` over the L4's 121 TFLOPS bf16 dense peak), computed per GPU so the two columns are comparable. **21.9% → 21.7% is the result worth naming:** the second GPU does not make the first one less efficient. Both ranks processed the same 2,133,839 tokens, which is also an independent check that the global batch really was held constant.
 
 **The 99% is a fact about LoRA, not about DDP.** Only the adapter's ~18.9M parameters (0.23% of 8.2B) are all-reduced, so a step moves ~38 MB against 13 s of compute — communication cannot be the bottleneck. Full fine-tuning would move ~16 GB per step and would not look like this. Quote the number with that premise attached.
 

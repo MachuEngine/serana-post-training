@@ -2,8 +2,8 @@
 |---|---|---|---|---|---|---|---|
 | sft-lora-bf16 (adapter, concurrency=8) | - | - | p50=0.213s p95=0.422s | - | - | 80.6 tok/s | - |
 | sft-merged-bf16 (no adapter, concurrency=8) | - | - | p50=0.247s p95=0.839s | - | - | 75.4 tok/s | - |
-| SFT training, 1x L4 (bf16 LoRA, RunPod, global batch 16) | ~19 GB | 19.31 GB | 26.39 s/step training, 27.63 s/step end-to-end | 100 | - | 150 steps in 4145 s | - |
-| SFT training, 2x L4 DDP (same run, NCCL_P2P_DISABLE=1) | ~19 GB/GPU | 19.37 GB/GPU | 13.31 s/step training, 15.46 s/step end-to-end | 100 | - | 1.98x speedup / 99.1% efficiency (1.79x / 89.4% end-to-end) | - |
+| SFT training, 1x L4 (bf16 LoRA, RunPod, global batch 16) | ~19 GB | 19.31 GB | 26.39 s/step training, 27.63 s/step end-to-end | 100 | 21.9 | 0.606 samples/s, 539 tok/s | - |
+| SFT training, 2x L4 DDP (same run, NCCL_P2P_DISABLE=1) | ~19 GB/GPU | 19.37 GB/GPU | 13.31 s/step training, 15.46 s/step end-to-end | 100 | 21.7 (per GPU) | 1.202 samples/s, 1069 tok/s -- 1.98x speedup / 99.1% efficiency | - |
 | serving KV-cache (max_model_len=4096, max_num_seqs=8, bf16) | 4.50 GB (worst-case, all 8 seqs @ 4096 tok) | 3.17 GB default alloc / 4.87 GB to fully utilize (vLLM's own report) | - | - | - | - | - |
 | sft-merged-bf16 (concurrency=8) | 15.27 GB weights (predicted) | 15.36 GiB weights / ~19.5GB total @ util=0.9 | p50=0.247s p95=0.839s | - | - | 75.4 tok/s | - |
 | sft-merged-awq (concurrency=8) | 3.82 GB weights (predicted) | 5.8 GiB weights / ~19.3GB total @ util=0.9 | p50=0.091s p95=0.529s | - | - | 183.8 tok/s | - |

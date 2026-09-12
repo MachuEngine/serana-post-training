@@ -4,7 +4,7 @@
   "measured_vram_gb": "19.31 GB",
   "step_time_or_ttft": "26.39 s/step training, 27.63 s/step end-to-end",
   "gpu_util_pct": "100",
-  "mfu_pct": "-",
-  "throughput": "150 steps in 4145 s",
+  "mfu_pct": "21.9",
+  "throughput": "0.606 samples/s, 539 tok/s",
   "cost_usd": "-"
 }
