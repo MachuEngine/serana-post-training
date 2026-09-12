@@ -30,13 +30,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import load_config
+from src.eval.eval_set import artifact_name, eval_set_dir
 from src.serve.pipeline import generate
 
-EVAL_SET_DIR = Path("data/eval/eval_set_v1")
 
-
-def run_quality_prompts(config: dict) -> list[dict]:
-    items = [json.loads(line) for line in (EVAL_SET_DIR / "eval_prompts.jsonl").open()]
+def run_quality_prompts(config: dict, eval_dir: Path) -> list[dict]:
+    items = [json.loads(line) for line in (eval_dir / "eval_prompts.jsonl").open()]
     results = []
     for i, item in enumerate(items):
         r = generate(config, item["prompt_ko"])
@@ -55,8 +54,8 @@ def run_quality_prompts(config: dict) -> list[dict]:
     return results
 
 
-def run_attack_probes(config: dict) -> list[dict]:
-    items = [json.loads(line) for line in (EVAL_SET_DIR / "attack_probes.jsonl").open()]
+def run_attack_probes(config: dict, eval_dir: Path) -> list[dict]:
+    items = [json.loads(line) for line in (eval_dir / "attack_probes.jsonl").open()]
     results = []
 
     # single-turn probes: direct/meta/role_exit
@@ -108,26 +107,31 @@ def run_attack_probes(config: dict) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="e.g. config/experiments/sft.yaml")
+    parser.add_argument("--eval-version", default="v1", help="eval set version (v1 default)")
     args = parser.parse_args()
 
     config = load_config(args.config)
     config_name = Path(args.config).stem
+    eval_dir = eval_set_dir(args.eval_version)
 
     print(
-        f"generating for config={config_name} (model_weights={config.get('model_weights')}, "
+        f"generating for config={config_name} eval={args.eval_version} "
+        f"(model_weights={config.get('model_weights')}, "
         f"lora_adapter_id={config.get('lora_adapter_id')})"
     )
-    quality = run_quality_prompts(config)
-    attack = run_attack_probes(config)
+    quality = run_quality_prompts(config, eval_dir)
+    attack = run_attack_probes(config, eval_dir)
 
     out = {
         "config": config_name,
+        "eval_version": args.eval_version,
         "base_model": config["model"]["base_id"],
         "quantization": config.get("serving", {}).get("quantization"),
         "quality_raw": quality,
         "attack_raw": attack,
     }
-    out_path = Path("artifacts/runs") / f"raw_eval_{config_name}.json"
+    stem = artifact_name("raw_eval", config_name, args.eval_version)
+    out_path = Path("artifacts/runs") / f"{stem}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
     print(f"wrote {out_path} ({len(quality)} quality + {len(attack)} attack replies)")

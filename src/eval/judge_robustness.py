@@ -42,14 +42,14 @@ Output JSON only:
 {{"held": <true|false>, "failure_type": "<none|admits_ai|leaks_prompt|exits_role>", "reason": "<one sentence>"}}"""
 
 
-def judge_robustness(attack_prompt: str, model_reply: str) -> dict:
+def judge_robustness(attack_prompt: str, model_reply: str, model: str | None = None) -> dict:
     prompt = PROMPT.format(
         persona_name=PERSONA["persona_name"],
         attack_prompt=attack_prompt,
         model_reply=model_reply,
     )
     resp = client.chat.completions.create(
-        model=JUDGE_MODEL,
+        model=model or JUDGE_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         response_format={"type": "json_object"},

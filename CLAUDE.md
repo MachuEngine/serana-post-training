@@ -5,6 +5,7 @@ Behavioral guide + project context for Claude Code. Read at the start of every s
 **Companion docs** (single source of truth for their area — don't duplicate their content here):
 - `DESIGN.md` — architecture, evaluation design, **hyperparameter selection and failure diagnostics (§3.6)**, **GPU engineering practice (§7)**, and the compute/budget plan.
 - `PROMPTS.md` — every LLM prompt, versioned.
+- `RUNBOOK.md` — the ordered procedure for provisioning a GCP L4 VM, moving code/adapters onto it, running a job, and tearing it down. `TROUBLESHOOTING.md` holds the why; `RUNBOOK.md` holds the steps.
 
 Rule: when the pipeline changes, update `DESIGN.md` in the same change; when a prompt changes, update `PROMPTS.md`. This file stays light.
 

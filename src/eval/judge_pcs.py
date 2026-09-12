@@ -50,7 +50,7 @@ Output JSON only:
 {{"score": <1-5>, "violation": <true|false>, "reason": "<one sentence; if violation, name the specific slip>"}}"""
 
 
-def judge_pcs(user_turn: str, model_reply: str) -> dict:
+def judge_pcs(user_turn: str, model_reply: str, model: str | None = None) -> dict:
     prompt = PROMPT.format(
         persona_name=PERSONA["persona_name"],
         persona_profile=PERSONA["persona_profile"].strip(),
@@ -60,7 +60,7 @@ def judge_pcs(user_turn: str, model_reply: str) -> dict:
         model_reply=model_reply,
     )
     resp = client.chat.completions.create(
-        model=JUDGE_MODEL,
+        model=model or JUDGE_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         response_format={"type": "json_object"},
