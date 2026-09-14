@@ -34,5 +34,13 @@ train:
   # so the GCS round trip being exercised is the real one.
   checkpoint_uri: gs://serana-post-training-ann10266/artifacts/diagnostics
 tracking:
-  mode: offline    # switched to online once WANDB_API_KEY is set; the resume
-                   # mechanism is identical either way
+  # Online, and that is not incidental. Run offline, this demo loses the
+  # killed leg's history: offline mode buffers records into a local file
+  # and SIGKILL truncates it mid-write, so the points logged before the
+  # kill never reach the server even though the checkpoint and the run id
+  # survive. Measured here -- the first attempt uploaded only steps 35-60.
+  # Online streams each record as it is logged, so a hard kill loses at
+  # most the last partial write. The resume *mechanism* is identical
+  # either way; what differs is whether the record of the first leg
+  # exists to be resumed into.
+  mode: online

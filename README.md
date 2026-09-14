@@ -177,9 +177,16 @@ rather than from guesses.
 `run_report.json` was rewritten on every launch — and `train.checkpoint_uri`, declared
 since P0, was read by no code. Both are closed. A run killed with `SIGKILL`, with its
 local directory moved away entirely, restored from GCS alone, reattached to the same W&B
-run, and resumed at its checkpoint: steps 5–60 with no gap or repeat, and loss moving
-**−0.2234** across the seam against a 3.7084 span. The sign matters — a checkpoint that
-restored weights but lost optimizer state makes loss jump *up* there.
+run, and resumed at its checkpoint: steps 5–60 with no gap or repeat, all 12 points on
+the server, and loss moving **−0.2162** across the seam against a 3.7048 span. The sign
+matters — a checkpoint that restored weights but lost optimizer state makes loss jump *up*
+there.
+
+Run once in W&B's *offline* mode first, and only 6 of those 12 points survived: offline
+buffers records into a local file, and `SIGKILL` truncates it mid-write, so the killed
+leg's history never reaches the server. The resume mechanism is identical in both modes;
+what differs is whether the record of the first leg exists at all — which is the entire
+point of tracking a preemptible run. Recorded rather than quietly re-run.
 
 **Training/serving parity.** Nothing had checked whether the numbers above describe the
 adapter or the serving stack. Same adapter, same prompts, greedy decoding, PyTorch/MPS
