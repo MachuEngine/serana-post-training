@@ -59,7 +59,7 @@ The main risk is scope growth. The experiment is deliberately **minimal**: three
 | Contrast personas (other NPCs) | Triples the data pipeline to earn one metric. |
 | A data-scale sweep (100/500/1k/3k) | Replaced by the CPT→SFT→DPO axis at the same cost. |
 | Custom CUDA / Triton kernels | Weeks of work for a signal §7.2–§7.3 already provide. |
-| FSDP / DeepSpeed ZeRO sharding | 4-bit 8B fits one L4; sharding would be theater. Plain DDP on 2× L4 (DESIGN.md §8) is the honest multi-GPU demo. |
+| FSDP / DeepSpeed ZeRO sharding | 4-bit 8B fits one L4; sharding would be theater — **the arithmetic is now written down, DESIGN.md §7.7**: ZeRO-2 would save 0.5% of the measured peak, ZeRO-3 saves real memory that nothing here needs at ~430× the communication, and full fine-tuning (98–131 GB) is the regime where it stops being optional. Plain DDP on 2× L4 (§7.6, done) is the honest multi-GPU demo. |
 | A full hyperparameter grid search | §3.6 buys the *judgement* with three short probes. A grid buys marginal accuracy at many times the cost. |
 | Broad Elder Scrolls world lore | Knowledge breadth is not a deliverable. |
 | Multi-seed eval runs | Eval decoding is greedy, so seeds change nothing. Free cut. |

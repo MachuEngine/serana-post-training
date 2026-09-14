@@ -525,9 +525,47 @@ MFU by §7.3's convention (`6 × N_params × tokens / wall_seconds` over the L4'
 
 One environment caveat worth carrying: the run needs `NCCL_P2P_DISABLE=1`. Without it the first all-reduce hangs forever even though NCCL initialises and reports its P2P channels as connected — the tell is power draw, 31–35 W of 72 W while pinned at 100% utilization, against 67–73 W when actually training.
 
-### 7.7 What this section deliberately excludes
+### 7.7 Why DDP and not FSDP/ZeRO — the arithmetic
 
-Custom CUDA/Triton kernels, FSDP/DeepSpeed sharding, tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the other two are unnecessary when a 4-bit 8B fits one card. Plain DDP on 2× L4 (§7.6) is the honest multi-GPU version, and it is done.
+CLAUDE.md's scope table rules sharding out in one line ("a 4-bit 8B fits one L4; sharding would be theater"). That is the right call, but an assertion is not the same as the numbers, and this was the one decision in §7 stated without them. Here they are, derived from the parameter counts §7.1 already establishes (6.946B linear + 1.245B embeddings/head = 8.190B total; 18.9M trainable at r=16).
+
+*Units: decimal GB (10⁹ bytes), matching §7.6's 16.4 GB weight figure. Measured peaks quoted from `torch.cuda.max_memory_allocated()` are GiB, so a direct comparison carries a ~7% conversion — it never changes a conclusion here, where every margin is 4× or wider.*
+
+**What sharding would actually save on this workload.** The ZeRO stages shard progressively more, and LoRA has already removed most of what the first two target. Measured against §7.6's 2× L4 bf16 leg (19.37 GB peak per GPU):
+
+| | shards | saved per GPU | share of 19.37 GB |
+|---|---|---|---|
+| DDP (shipped) | nothing — each rank holds a full replica | — | — |
+| ZeRO-1 | optimizer state | 0.076 GB | 0.4% |
+| ZeRO-2 | + gradients | 0.094 GB | **0.5%** |
+| ZeRO-3 / FSDP `FULL_SHARD` | + the frozen base weights | 8.28 GB | 43% |
+
+ZeRO-1 and ZeRO-2 are pointless here for a reason specific to the method: they shard exactly the terms LoRA has already shrunk to nothing. Trainable parameters are 18.9M, so gradients are 38 MB and AdamW's two fp32 moments are 151 MB — the entire target of ZeRO-2 is **0.19 GB inside a 19.37 GB footprint**. Sharding what LoRA already made negligible is the definition of theater.
+
+ZeRO-3 is the honest case and deserves stating separately rather than being lumped in: it *does* save real memory — 8.28 GB — because it shards the 16.4 GB of frozen base weights that dominate the footprint. It is declined anyway, on three grounds:
+
+1. **Nothing to spend it on.** The bf16 leg peaked at 19.37 GB of 24, and the shipped 4-bit training config peaked at **9.64 GB** (§7.1's table) — roughly 13 GB spare on a single card. Freed memory is only worth its cost when it buys batch size, sequence length, or a bigger model. Here it buys headroom that already exists.
+2. **The cost is not small.** ZeRO-3 all-gathers the full parameter set once in the forward pass and again in the backward: ~16.4 GB of traffic per step per direction, against DDP's single **38 MB** all-reduce of the adapter — roughly **430× the communication**, to save memory nobody needs. §7.6's 99.1% scaling efficiency is a direct consequence of that 38 MB and would not survive the trade.
+3. **On the shipped 4-bit path it is not even straightforward.** The 4-bit base is ~6 GB (6.946B linear at ~0.5 bytes, 1.245B embeddings/head left in bf16), so ZeRO-3 across two cards saves ~3 GB. But bitsandbytes stores those weights as `Params4bit`, not ordinary tensors, and FSDP cannot flatten and shard them without the Answer.AI FSDP+QLoRA patch set. Real engineering cost against a ~3 GB saving on a run with 13 GB to spare.
+
+**Where sharding stops being optional.** Full fine-tuning the same model — no LoRA, bf16 weights, AdamW:
+
+| term | size |
+|---|---|
+| weights (bf16) | 16.4 GB |
+| gradients (bf16) | 16.4 GB |
+| AdamW moments (fp32 m, v) | 65.5 GB |
+| **floor** | **98.3 GB** |
+| + fp32 master copy (standard mixed precision) | 131.0 GB |
+| + activations | more |
+
+Under DDP every rank needs all of that resident, so **no number of L4s can run it**: 98.3 GB against ~22.5 GB usable per card is not a scaling problem, it is a wall. ZeRO-3/FSDP divides the 98.3 GB by rank count and turns it into an eight-card job. That is the regime the technique exists for, and this project is nowhere near it — which is the point of writing the number down rather than asserting the conclusion.
+
+**What would flip this.** A base model past ~30B, full fine-tuning instead of LoRA, or a sequence length long enough for activations to dominate. None are in scope (§3.5, §7.8). If one became so, the first move is to re-run this arithmetic, not to reach for the framework.
+
+### 7.8 What this section deliberately excludes
+
+Custom CUDA/Triton kernels and tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the second is unnecessary when a 4-bit 8B fits one card. FSDP/DeepSpeed sharding is excluded too — with the arithmetic behind that decision in §7.7, rather than as an assertion. Plain DDP on 2× L4 (§7.6) is the honest multi-GPU version, and it is done.
 
 ---
 
