@@ -1,0 +1,77 @@
+# The service layer: src/serve/api.py in front of the vLLM Service.
+# `__GATEWAY_IMAGE__` is substituted by deploy/deploy_gateway.sh.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serana-gateway
+  labels:
+    app: serana-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: serana-gateway
+  template:
+    metadata:
+      labels:
+        app: serana-gateway
+    spec:
+      # Tolerating the GPU taint is a workaround, not the design. The right
+      # home for a CPU-only pod is the default pool, but e2-medium is 93%
+      # committed to GKE's own system pods before anything of ours lands,
+      # and a second node cannot be added: the project's SSD_TOTAL_GB quota
+      # (500) is already at 450 across the L4 node, the default node, and
+      # the stopped P5 VM's disk. The L4 node has 8 vCPU with vLLM using a
+      # fraction, so this rides there. No `nvidia.com/gpu` request, so it
+      # never takes the card from the server.
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      containers:
+        - name: gateway
+          image: __GATEWAY_IMAGE__
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # In-cluster the upstream is the Service DNS name, not localhost.
+            - name: SERANA_BASE_URL
+              value: http://serana-vllm:8000/v1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          # /healthz reports the gateway up even while vLLM is still loading
+          # (it returns upstream_ok: false instead of failing). That is
+          # deliberate: restarting the gateway would not help a model that is
+          # still reading 16 GB off disk, and a crash loop here would hide it.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: serana-gateway
+  labels:
+    app: serana-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: serana-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

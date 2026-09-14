@@ -5,7 +5,9 @@ pipeline.py` is the client side; this is the "up" half.
 
 Registers every distinct `lora_adapter_id` found across
 `config/experiments/*.yaml` whose adapter directory actually exists
-under `artifacts/lora/` -- rather than hardcoding "serana-sft"/
+under `ADAPTER_ROOT` (default `artifacts/lora/`; the container image sets
+it to the volume an initContainer downloads into) -- rather than
+hardcoding "serana-sft"/
 "serana-dpo" here too, so this stays in sync with whatever configs exist
 without a second place to edit. Diagnostics adapters are excluded for
 free (CLAUDE.md: "diagnostic runs never produce a shipped adapter") --
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -33,10 +36,14 @@ from src.config import load_config
 
 BASE_CFG = yaml.safe_load(open("config/base.yaml"))
 
+# Where adapter directories live. The container image overrides this to the
+# emptyDir its initContainer pulls from GCS into; locally it is the repo path.
+ADAPTER_ROOT = Path(os.environ.get("ADAPTER_ROOT", "artifacts/lora"))
+
 
 def discover_adapters() -> dict[str, str]:
     """{adapter_id: local_path}, one entry per distinct lora_adapter_id
-    named across config/experiments/*.yaml whose artifacts/lora/<id>
+    named across config/experiments/*.yaml whose <ADAPTER_ROOT>/<id>
     directory exists."""
     adapters = {}
     for exp_path in sorted(glob.glob("config/experiments/*.yaml")):
@@ -44,7 +51,7 @@ def discover_adapters() -> dict[str, str]:
         adapter_id = cfg.get("lora_adapter_id")
         if not adapter_id:
             continue
-        local_path = Path("artifacts/lora") / adapter_id
+        local_path = ADAPTER_ROOT / adapter_id
         if local_path.exists():
             adapters[adapter_id] = str(local_path)
     return adapters
@@ -61,6 +68,12 @@ def main() -> None:
         "--model",
         default=None,
         help="override base.yaml's model.base_id (e.g. an AWQ-merged model dir for Stage 4)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the vllm command that would run, then exit -- lets the image be "
+        "verified on a machine with no GPU",
     )
     args = parser.parse_args()
 
@@ -86,7 +99,10 @@ def main() -> None:
         cmd += [f"{name}={path}" for name, path in adapters.items()]
 
     print("launching:", " ".join(cmd))
+    print(f"adapter root: {ADAPTER_ROOT}")
     print(f"registered adapters: {adapters or '(none found)'}")
+    if args.dry_run:
+        return
     subprocess.run(cmd, check=True)
 
 

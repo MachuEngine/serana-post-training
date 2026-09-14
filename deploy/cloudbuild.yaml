@@ -1,0 +1,14 @@
+# Cloud Build config. Needed rather than the simpler `gcloud builds submit
+# --tag`, because that form requires the Dockerfile to sit at the root of
+# the build context, and this one lives in deploy/ -- `submit` has no
+# -f/--file flag to point elsewhere.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "deploy/Dockerfile", "-t", "${_IMAGE}", "."]
+# Listing it here is what makes Cloud Build push it after a successful build.
+images: ["${_IMAGE}"]
+options:
+  logging: CLOUD_LOGGING_ONLY
+# The vLLM base image is >10 GB to pull and push again; the 10-minute
+# default is not enough.
+timeout: 3600s

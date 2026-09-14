@@ -1,0 +1,16 @@
+# ClusterIP, not LoadBalancer, on purpose: the eval scripts and the parity
+# check reach it through `kubectl port-forward`, which costs nothing and
+# keeps a Bethesda-IP-derived model off a public address. A LoadBalancer
+# would be one line to add if this ever needed to be reachable.
+apiVersion: v1
+kind: Service
+metadata:
+  name: serana-vllm
+spec:
+  type: ClusterIP
+  selector:
+    app: serana-vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -7,9 +7,11 @@ dependencies = [
     "accelerate>=1.14.0",
     "fastapi>=0.120.0",
     "gradio>=5.0.0",
+    "httpx>=0.28.0",
     "huggingface-hub>=0.26.0",
     "openai>=3.3.1",
     "peft>=0.20.0",
+    "prometheus-client>=0.21.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "torch>=2.13.0",
@@ -35,6 +37,11 @@ dependencies = [
 # gradio/huggingface-hub added in P6: gradio for demo/app.py, huggingface-hub
 # for scripts/upload_to_hub.py (was already available transitively via
 # transformers, but P6 code imports it directly so it gets its own entry).
+# prometheus-client/httpx added in P9 for src/serve/api.py, the service
+# layer in front of vLLM. prometheus-client is what exposes /metrics;
+# httpx was already available transitively (openai depends on it) but
+# api.py's health check imports it directly, so it gets its own entry --
+# same rule huggingface-hub got in P6.
 # bitsandbytes still deliberately not added -- P2/P4's training path
 # installed it directly on the VM (see p2_progress.md's environment-bugs
 # section) rather than through this file, since it isn't usable on the

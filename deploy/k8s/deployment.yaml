@@ -1,0 +1,114 @@
+# One replica of the vLLM server, base weights plus every adapter found in
+# GCS. `__IMAGE__` is substituted by deploy/cluster_up.sh with the tag it
+# just built -- the manifest never carries a floating `:latest`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serana-vllm
+  labels:
+    app: serana-vllm
+spec:
+  replicas: 1
+  # The GPU node fits exactly one replica, so a rolling update would
+  # deadlock waiting for a second node. Recreate: take the old pod down
+  # first. Costs ~10 min of downtime per deploy, which is the honest
+  # trade at one GPU.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: serana-vllm
+  template:
+    metadata:
+      labels:
+        app: serana-vllm
+    spec:
+      # Bound to the GCS-reading Google service account by Workload
+      # Identity (cluster_up.sh) -- no key file anywhere in the cluster.
+      serviceAccountName: serana
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      volumes:
+        - name: adapters
+          emptyDir: {}
+        - name: hf-cache
+          emptyDir: {}
+        # vLLM's workers talk over shared memory; the 64 MB default /dev/shm
+        # in a container is not enough and fails in ways that read like a
+        # CUDA error rather than a shm error.
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+      initContainers:
+        # Adapters are pulled at pod start rather than baked into the image:
+        # a new adapter needs no new image, and they stay off the registry.
+        - name: fetch-adapters
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              gcloud storage cp -r "$BUCKET/artifacts/lora/*" /adapters/
+              echo "--- adapters present ---"
+              ls -1 /adapters
+          env:
+            - name: BUCKET
+              value: gs://serana-post-training-ann10266
+          volumeMounts:
+            - name: adapters
+              mountPath: /adapters
+      containers:
+        - name: vllm
+          image: __IMAGE__
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            # GKE injects the host's NVIDIA driver into the container at
+            # /usr/local/nvidia, but only images GKE itself builds have that
+            # on their library path. vLLM's official image does not, so
+            # without this the container starts, fails to load libcuda.so.1,
+            # reports "No platform detected, vLLM is running on
+            # UnspecifiedPlatform", and exits 1 -- a message that names
+            # neither GPUs nor the driver. This one line is the fix.
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nvidia/lib64
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: adapters
+              mountPath: /adapters
+            - name: hf-cache
+              mountPath: /hf-cache
+            - name: dshm
+              mountPath: /dev/shm
+          # The 16 GB base model downloads from HF into an emptyDir on every
+          # pod start, then loads onto the card. Measured on the VM at roughly
+          # 8-10 minutes; 20 minutes of startup budget leaves room for a slow
+          # pull without a crash loop. A readiness/liveness probe alone would
+          # kill the pod long before the server ever answers -- this is the
+          # single most common way a first GPU deployment fails.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 15
+            failureThreshold: 80
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 6

@@ -1,0 +1,12 @@
+# Build config for the small service-layer image. Same shape as
+# deploy/cloudbuild.yaml, pointed at Dockerfile.gateway.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "deploy/Dockerfile.gateway", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]
+options:
+  logging: CLOUD_LOGGING_ONLY
+# No 12 GB base image here, so the default would probably do -- but a pip
+# install over a slow mirror is the kind of thing that trips the 10-minute
+# default at the worst moment.
+timeout: 1200s
