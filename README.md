@@ -145,9 +145,53 @@ Full predicted-vs-measured trail for every GPU phase, including two real environ
 
 ## Stack
 
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI-compatible server, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (tracking, resumable across preemption) · `vLLM` (OpenAI-compatible server, multi-adapter) behind a `FastAPI` gateway · `Docker` + `GKE` (1× L4 node pool, scales to zero) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
 
 PPO/reward-model RLHF is deliberately excluded: policy + reference + reward + value simultaneously resident needs **26.06 GiB realistically, and 22.32 GiB even on the accounting most generous to PPO, against 22.5 GiB usable** on the L4 (`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). That calculation is itself part of the deliverable — see the PPO counterfactual table above.
+
+## Operations layer
+
+The training and serving above ran on a VM driven by `nohup`. This layer is the same
+work packaged the way a team would run it, and it is measured rather than asserted.
+
+**Serving.** `deploy/` builds one image (vLLM pinned to `v0.11.0` — the first time this
+project recorded a serving engine version at all) and brings up a GKE cluster whose L4
+node pool scales to zero. Adapters are pulled from GCS at pod start by an initContainer
+under Workload Identity, so a new adapter needs no new image. `deploy/cluster_up.sh` up,
+`deploy/cluster_down.sh` down. Verified: base plus all three adapters register on one
+server, and `main.py` runs against the cluster with no code change.
+
+Stated plainly: at one replica with no traffic, GKE buys nothing functionally. It buys a
+reproducible pinned image, a GPU that bills only while a pod needs it, and the operational
+surface — Workload Identity, startup probes, init containers — that a VM plus `nohup`
+never touches.
+
+**Service layer.** `src/serve/api.py` is the FastAPI this stack line used to claim while
+importing it nowhere: `/chat` (calling the same `pipeline.generate()` everything else
+uses, not a second inference path), `/chat/stream` (SSE), `/healthz`, `/metrics`.
+Prometheus scrapes it and vLLM; the Grafana dashboard is a checked-in JSON file whose
+histogram buckets and metric names came from P5's measurements and a live `/metrics`
+rather than from guesses.
+
+**Tracking.** A Spot preemption used to split a run into two records, because
+`run_report.json` was rewritten on every launch — and `train.checkpoint_uri`, declared
+since P0, was read by no code. Both are closed. A run killed with `SIGKILL`, with its
+local directory moved away entirely, restored from GCS alone, reattached to the same W&B
+run, and resumed at its checkpoint: steps 5–60 with no gap or repeat, and loss moving
+**−0.2234** across the seam against a 3.7084 span. The sign matters — a checkpoint that
+restored weights but lost optimizer state makes loss jump *up* there.
+
+**Training/serving parity.** Nothing had checked whether the numbers above describe the
+adapter or the serving stack. Same adapter, same prompts, greedy decoding, PyTorch/MPS
+against vLLM: **20 of 30 replies byte-identical**, divergence starting at token 11 on
+median. Where they differ the behaviour category survives — both runtimes refuse the
+out-of-boundary question and cite the same reason — but one prompt diverges at token 0
+into a genuinely different claim. Reported rather than smoothed: **aggregate metrics port
+across runtimes, per-prompt anecdotes do not.**
+
+Full write-up including five failures worth reading (three of which report a cause that is
+not the cause): [`artifacts/runs/p9_progress.md`](artifacts/runs/p9_progress.md),
+[`artifacts/runs/parity_report.md`](artifacts/runs/parity_report.md).
 
 ## Reproducing
 
