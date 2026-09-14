@@ -495,9 +495,28 @@ The interview value is being able to say *"gradient checkpointing cost me X% ste
 
 **Adapter overhead.** LoRA adds a per-token forward-pass cost. All configs share an identical prompt shape, so this is the only real serving-side variable. A near-zero delta is a legitimate finding — *"post-training bought quality at no serving cost."*
 
-### 7.5 Spot preemption as GPU ops
+### 7.5 Spot preemption as GPU ops, and one record per run
 
 Preemption is guaranteed on Spot, so treat recovery as a designed capability. Deliverables: the preemption event in the run log, the resumed loss curve showing continuity across the gap, and the wall-clock overhead of the restart.
+
+**Two gaps had to close before that curve could exist**, and both were live in the repo until P9.
+
+*The record was overwritten.* `run_report.json` was rewritten from scratch on every launch. Resuming worked — `get_last_checkpoint` plus `resume_from_checkpoint` — but the second leg's report replaced the first's. A run preempted twice had no record of its middle. `src/finetune/tracking.py` fixes this by attaching both legs to one **W&B** run: the run id is generated once, written next to the adapter as `wandb_run_id.txt`, and read back on resume, so continuity comes from a file that travels with the checkpoints rather than from an argument someone has to remember.
+
+*The checkpoints could not travel.* `train.checkpoint_uri` has been declared in `base.yaml` since P0 and no code read it — `train.py`'s own comment admitted local checkpoints were only sufficient "because the VM's `--instance-termination-action=STOP` keeps the boot disk alive". That covers a restarted *same* VM. It does not cover the case you actually hit when a zone runs out of capacity: creating a *new* VM, where everything not in GCS is gone. `src/finetune/gcs_sync.py` mirrors the adapter directory (checkpoints and the run id together) on every save, and pulls it back before training starts.
+
+**W&B rather than MLflow**, decided on this stack's constraints rather than on features:
+
+| | W&B | MLflow |
+|---|---|---|
+| Resume to the same run | `WANDB_RUN_ID` + `WANDB_RESUME`, honoured by TRL's Trainer with no glue | possible via `MLFLOW_RUN_ID`, but step collisions on a re-attached run need handling |
+| What has to stay alive | nothing | a tracking server, or a file backend — **on a Spot VM, the local file backend disappears with the VM, which is the failure being defended against** |
+
+`tracking.mode` is `online`, `offline` (records to disk, `wandb sync` uploads later — what a keyless machine uses), or `disabled`. Tracking failing must never be what kills a training run, so `gcs_sync` returns errors rather than raising and the run report records what actually happened: the restore result, every push, the run id, and the config hash.
+
+**Past runs were replayed, not abandoned.** Tracking arrived in P9, after CPT, SFT, both DPO attempts and both DDP legs had already run. `scripts/backfill_tracking.py` reads the `log_history` each `run_report.json` already contains and sends it, tagged `backfill` with its source path so a replayed history is never mistaken for a streamed one. Otherwise the project would open empty and the two most interesting results — the DPO null and the 2× L4 pair — would be the only ones missing.
+
+**The demonstration is local, deliberately.** `config/diagnostics/resume_demo.yaml` runs 0.6B on the M5, is killed mid-run, and is restarted. What is being proved is a mechanism the code either has or does not have, and it is device-independent — the same `train.py` path runs 0.6B here and 8B on the L4. Spending GPU-hours to watch the same two files be written would buy nothing. Per CLAUDE.md the loss *shape* from the sandbox is fair to discuss; its values and speeds are not comparable to GPU runs, and are not reported as such. Result: `artifacts/runs/p9_progress.md`.
 
 ### 7.6 Multi-GPU scaling, measured (DDP)
 

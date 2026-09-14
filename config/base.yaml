@@ -33,6 +33,11 @@ train:                                 # QLoRA on 1x L4 24GB (§3.5)
   data:
     cpt_file: data/ko/cpt_corpus.txt
     sft_file: data/ko/sft_3k.jsonl
+tracking:                              # §7.5 -- one record per run, across preemptions
+  backend: wandb                       # W&B over MLflow: resume is 2 env vars, no server to keep alive on a Spot VM
+  project: serana-post-training
+  entity: null                         # null = the account's default
+  mode: online                         # online | offline (records locally, `wandb sync` later) | disabled
 gpu:                                   # §7 -- instrumentation is config-driven too
   log_nvidia_smi: true
   nvidia_smi_interval_s: 1

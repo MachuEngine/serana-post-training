@@ -19,6 +19,7 @@ dependencies = [
     "trl>=1.10.0",
     "uvicorn>=0.38.0",
     "vllm>=0.11.0; sys_platform == 'linux'",
+    "wandb>=0.30.0",
 ]
 
 # torch/transformers/peft/trl/accelerate added in P1 for the §3.6b local

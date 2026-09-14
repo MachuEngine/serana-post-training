@@ -33,6 +33,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.trainer_utils import get_last_checkpoint
 from trl import DPOConfig, DPOTrainer, SFTConfig, SFTTrainer
 
+from src.finetune import gcs_sync, tracking
+
 PERSONA = yaml.safe_load(Path("config/persona.yaml").read_text())
 
 SYSTEM_PROMPT = """You are {persona_name}, a character from {source_title}.
@@ -198,6 +200,24 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
     for note in settings["downgrade_notes"]:
         print(f"[device downgrade] {note}")
 
+    # Restore before anything reads the adapter directory. On a fresh VM
+    # this is what puts the previous leg's checkpoints -- and the W&B run
+    # id that reattaches the curve -- back on local disk. Main process
+    # only: under DDP every rank would otherwise pull the same objects.
+    is_main = local_rank <= 0
+    if is_main:
+        pulled_ok, pull_msg = gcs_sync.pull(config)
+        print(f"[gcs] restore: {'ok' if pulled_ok else 'skipped'} -- {pull_msg}")
+        track_state = tracking.init(config, train_cfg["output_adapter"])
+        if track_state["enabled"]:
+            print(
+                f"[tracking] run_id={track_state['run_id']} "
+                f"({'resuming' if track_state['resumed'] else 'new'}, {track_state['mode']})"
+            )
+    else:
+        pulled_ok, pull_msg = False, "non-main rank"
+        track_state = {"enabled": False, "mode": "disabled", "run_id": None, "resumed": False}
+
     model, tokenizer = load_model_and_tokenizer(config, settings, device, local_rank)
     peft_config = None if isinstance(model, PeftModel) else build_lora_config(train_cfg)
 
@@ -237,7 +257,10 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
         save_strategy="steps",
         save_steps=train_cfg.get("checkpoint_every_steps", 50),
         save_total_limit=3,
-        report_to=[],
+        # TRL reads WANDB_RUN_ID/WANDB_RESUME from the environment, which
+        # tracking.init() has already set, so naming the integration here
+        # is the only wiring needed.
+        report_to=["wandb"] if track_state["enabled"] else [],
     )
     if train_cfg.get("max_steps"):
         common_args["max_steps"] = train_cfg["max_steps"]
@@ -335,6 +358,14 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
     else:
         raise ValueError(f"unknown train.method: {method!r}")
 
+    # Mirror each save to GCS. Main process only -- under DDP every rank
+    # runs the same callbacks, and two ranks rsyncing one directory to one
+    # URI would race for no benefit.
+    gcs_callback = None
+    if is_main and gcs_sync.remote_uri(config):
+        gcs_callback = gcs_sync.GCSCheckpointCallback(config)
+        trainer.add_callback(gcs_callback)
+
     resume_checkpoint = get_last_checkpoint(output_dir) if Path(output_dir).exists() else None
     if resume_checkpoint:
         print(f"[resume] found checkpoint at {resume_checkpoint}, resuming from there")
@@ -360,9 +391,21 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
         "final_train_loss": result.training_loss,
         "log_history": trainer.state.log_history,
         "output_adapter": output_dir,
+        # Recorded so a report always shows whether the run was tracked and
+        # under which id, rather than leaving that to be inferred.
+        "tracking": track_state,
+        "config_hash": tracking.config_hash(config),
+        "gcs_restore": pull_msg if pulled_ok else f"skipped ({pull_msg})",
+        "gcs_pushes": gcs_callback.results if gcs_callback else [],
     }
     if local_rank <= 0:  # single-process (-1) or DDP main (0) only
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         with open(Path(output_dir) / "run_report.json", "w") as f:
             json.dump(report, f, indent=2, default=str)
+        # Final push: the run report and the saved adapter itself land in
+        # GCS too, not just the intermediate checkpoints.
+        if gcs_callback is not None:
+            ok, msg = gcs_sync.push(config)
+            print(f"[gcs] final: {'ok' if ok else 'FAILED'} {msg}")
+        tracking.finish(report, track_state)
     return report
