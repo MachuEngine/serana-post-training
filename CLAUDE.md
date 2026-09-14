@@ -59,7 +59,7 @@ The main risk is scope growth. The experiment is deliberately **minimal**: three
 | Contrast personas (other NPCs) | Triples the data pipeline to earn one metric. |
 | A data-scale sweep (100/500/1k/3k) | Replaced by the CPT→SFT→DPO axis at the same cost. |
 | Custom CUDA / Triton kernels | Weeks of work for a signal §7.2–§7.3 already provide. |
-| FSDP / DeepSpeed ZeRO sharding | 4-bit 8B fits one L4; sharding would be theater. Plain DDP on 2× L4 (DESIGN.md §8) is the honest multi-GPU demo. |
+| FSDP / DeepSpeed ZeRO sharding | 4-bit 8B fits one L4; sharding would be theater — **the arithmetic is now written down, DESIGN.md §7.7**: ZeRO-2 would save 0.5% of the measured peak, ZeRO-3 saves real memory that nothing here needs at ~430× the communication, and full fine-tuning (98–131 GB) is the regime where it stops being optional. Plain DDP on 2× L4 (§7.6, done) is the honest multi-GPU demo. |
 | A full hyperparameter grid search | §3.6 buys the *judgement* with three short probes. A grid buys marginal accuracy at many times the cost. |
 | Broad Elder Scrolls world lore | Knowledge breadth is not a deliverable. |
 | Multi-seed eval runs | Eval decoding is greedy, so seeds change nothing. Free cut. |
@@ -153,6 +153,7 @@ Seven phases. **Every GPU phase's criterion includes its measurements** — a ph
 - **P4 DPO** — continue the SFT adapter with `DPOTrainer`, reference via PEFT adapter toggle. *Done:* trains within budget · **measured peak VRAM confirms the no-second-model claim** · reward-margin curve and held-out preference accuracy logged · smoke test shows no degeneration or length blowup.
 - **P5 Serving + Eval** — vLLM sized from the KV-cache arithmetic (§7.4), FastAPI streaming, then quality metrics + judge validation + hardware metrics across all three configs. *Done:* one endpoint serves any config · KV-cache budget predicted then verified against vLLM's reported blocks · throughput-vs-concurrency sweep plotted · AWQ vs bf16 compared on VRAM, TTFT, throughput, and PCS · both results tables regenerate from one command.
 - **P6 Ship** — Gradio demo on HF Spaces, adapters to HF Hub, README with both tables and the hardware stated, blog post. The §3.6 diagnostic curves go in the blog post and an appendix, not the results tables. *Done:* a stranger can open the demo and reproduce from the repo on a single 24GB GPU.
+- **P9 Operations layer** — the serving, tracking and monitoring surface a VM plus `nohup` never exercises. Containerised serving on GKE (`deploy/`, one command up and down, GPU node pool scaling to zero); the FastAPI service layer the stack line has claimed since P5 (`src/serve/api.py`) with Prometheus and a checked-in Grafana dashboard; experiment tracking that survives a preemption as **one** run, with the GCS checkpoint sync `train.checkpoint_uri` has declared since P0 and nothing read. *Done:* one image serves every config with no code change · a killed run resumes into the same tracked run from GCS alone · training/serving parity measured rather than assumed · every predicted-vs-measured gap recorded in `artifacts/runs/p9_progress.md`.
 
 **Optional, only after P0–P6 land** (DESIGN.md §8): 2× L4 DDP scaling run · DPO β sweep · CPT as a fourth eval config · multi-turn length check · brand-tone demo · vLLM Multi-LoRA serving.
 

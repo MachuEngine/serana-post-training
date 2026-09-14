@@ -234,6 +234,12 @@ __marimo__/
 # and raw eval-generation dump in there is small (<500KB total as of P5)
 # and is exactly the predicted-vs-measured evidence CLAUDE.md's working
 # principles are about -- same reasoning as data/eval/ above.
+# W&B's local run data (P9). Offline runs live here until `wandb sync`
+# uploads them; online runs keep a local mirror too. Machine-local state,
+# not a result -- the results that matter are in each run's
+# run_report.json (log_history) and artifacts/runs/p9_progress.md.
+/wandb/
+
 /artifacts/merged/*
 !/artifacts/merged/.gitkeep
 

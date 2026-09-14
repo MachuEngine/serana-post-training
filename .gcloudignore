@@ -1,0 +1,19 @@
+# What gcloud uploads as the Cloud Build source tarball. Without this file
+# gcloud derives the list from .gitignore, which keeps out .env and .venv
+# but still ships artifacts/ and data/ -- adapters and Bethesda-derived
+# dialogue that the build does not read and that need not sit in a staging
+# bucket. Keep this in step with .dockerignore.
+#
+# Note the two files do different jobs: .gcloudignore decides what leaves
+# the laptop, .dockerignore decides what the build daemon can COPY.
+.git/
+.venv/
+.ruff_cache/
+.claude/
+artifacts/
+data/
+demo/
+**/__pycache__/
+*.log
+.env
+uv.lock

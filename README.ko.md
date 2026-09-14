@@ -129,9 +129,56 @@ LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7
 
 ## 스택
 
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `vLLM` (OpenAI 호환 서버, multi-adapter) + `FastAPI` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (실험 추적, preemption 후에도 같은 run으로 재개) · `vLLM` (OpenAI 호환 서버, multi-adapter) 앞에 `FastAPI` 게이트웨이 · `Docker` + `GKE` (L4 노드풀, 0대까지 축소) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
 
 PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올리면 **현실적으로 26.06 GiB, PPO에 최대한 유리하게 잡아도 22.32 GiB가 필요한데 L4의 실사용 가능 용량은 22.5 GiB다**(`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다 — 위 PPO 반사실 표 참고.
+
+## 운영 계층
+
+위의 학습과 서빙은 VM에 `nohup`으로 띄워 돌렸다. 이 계층은 같은 일을 팀이 운영하는
+형태로 포장한 것이고, 주장이 아니라 측정으로 남겼다.
+
+**서빙.** `deploy/`가 이미지 하나를 만들고(vLLM을 `v0.11.0`으로 고정 — 이 프로젝트가
+서빙 엔진 버전을 기록한 것 자체가 처음이다) L4 노드풀이 0대까지 줄어드는 GKE 클러스터를
+올린다. 어댑터는 파드가 뜰 때 초기화 컨테이너가 Workload Identity로 GCS에서 받아오므로,
+어댑터가 바뀌어도 이미지를 다시 만들 필요가 없다. 올릴 때 `deploy/cluster_up.sh`,
+내릴 때 `deploy/cluster_down.sh`. 확인된 것: 베이스와 어댑터 3개가 한 서버에 등록되고,
+`main.py`가 코드 수정 없이 클러스터를 상대로 동작한다.
+
+솔직하게 적으면, 복제본 1개에 트래픽이 없는 규모에서 GKE의 기능적 이득은 없다. 얻는 것은
+버전이 고정된 재현 가능한 이미지, 파드가 필요할 때만 과금되는 GPU, 그리고 VM에 `nohup`으로
+띄우는 방식이 건드리지 않는 운영 표면(Workload Identity, 기동 프로브, 초기화 컨테이너)이다.
+
+**서비스 계층.** `src/serve/api.py`는 이 스택 줄이 적어만 두고 정작 import하는 코드는 없던
+그 FastAPI다. `/chat`(다른 모든 경로가 쓰는 `pipeline.generate()`를 그대로 호출한다.
+두 번째 추론 경로를 만들지 않았다), `/chat/stream`(SSE), `/healthz`, `/metrics`.
+Prometheus가 이것과 vLLM을 수집하고, Grafana 대시보드는 저장소에 커밋된 JSON 파일이다.
+히스토그램 구간과 지표 이름은 짐작이 아니라 P5 측정값과 살아 있는 `/metrics`에서 가져왔다.
+
+**실험 추적.** 예전에는 Spot preemption이 한 번의 학습을 두 개의 기록으로 쪼갰다.
+`run_report.json`이 실행할 때마다 덮어써졌고, P0부터 선언돼 있던 `train.checkpoint_uri`는
+읽는 코드가 없었다. 둘 다 메웠다. `SIGKILL`로 죽이고 **로컬 디렉토리를 통째로 치운** 뒤
+다시 띄우자, GCS에서만 복원해 같은 W&B run에 다시 붙고 체크포인트에서 이어졌다.
+스텝 5~60에 빠짐도 중복도 없고 12개 지점이 모두 서버에 남았으며, 이음매에서 손실이
+전체 폭 3.7048 대비 **−0.2162** 움직였다. 부호가 중요하다 — 가중치만 복원하고
+옵티마이저 상태를 잃은 체크포인트는 거기서 손실이 *위로* 튄다.
+
+처음에는 W&B *오프라인* 모드로 돌렸고, 12개 중 6개만 살아남았다. 오프라인은 기록을
+로컬 파일에 버퍼링하는데 `SIGKILL`이 그 파일을 쓰는 중간에 자르기 때문에, 죽은 구간의
+기록이 서버에 도달하지 못한다. 재개 *구조*는 두 모드에서 같지만, 1차 구간의 기록이
+남느냐가 다르다 — 그리고 그게 preemption 당하는 학습을 추적하는 이유 그 자체다.
+조용히 다시 돌리지 않고 기록으로 남긴다.
+
+**학습·서빙 정합성.** 위의 숫자들이 어댑터를 설명하는지 서빙 스택을 설명하는지 확인한 적이
+없었다. 같은 어댑터, 같은 문항, 탐욕적 디코딩으로 PyTorch/MPS와 vLLM을 비교했다:
+**30개 중 20개가 토큰 단위로 완전히 같고**, 분기 시작 위치 중앙값은 토큰 11이다.
+갈라진 경우에도 행동 범주는 유지된다 — 양쪽 모두 지식 경계 밖 질문을 같은 근거로 거절한다.
+다만 한 문항은 토큰 0부터 갈려 서로 다른 사실을 주장한다. 다듬지 않고 그대로 적는다:
+**집계 지표는 런타임이 바뀌어도 이식되지만, 문항 단위 일화는 그렇지 않다.**
+
+읽을 만한 실패 다섯 개(그중 셋은 오류 메시지가 원인이 아닌 곳을 가리킨다)를 포함한 전체 기록:
+[`artifacts/runs/p9_progress.md`](artifacts/runs/p9_progress.md),
+[`artifacts/runs/parity_report.md`](artifacts/runs/parity_report.md).
 
 ## 재현하기
 

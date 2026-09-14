@@ -355,7 +355,89 @@ stop step is the one that matters.
 
 ---
 
-## 9. Quick reference
+## 9. GKE serving (P9)
+
+The VM path above still works and is what every P2-P8 number came from.
+This is the containerised version of the same server: one image, one
+cluster, `deploy/` owns the lifecycle the way `scripts/` owns the VM's.
+
+Why at all, stated plainly: at one replica with no traffic, GKE buys
+nothing functionally. What it buys is a pinned, reproducible image, a
+GPU that bills only while a pod needs it, and the operational surface
+(Workload Identity, probes, init containers) that a VM plus `nohup`
+never exercises.
+
+### 9.1 One command up, one down
+
+```bash
+deploy/cluster_up.sh                 # cluster + GPU pool + identity + image + manifests
+deploy/cluster_up.sh <IMAGE>         # ...reusing an image that already exists
+kubectl port-forward svc/serana-vllm 8000:8000    # reach it locally
+deploy/cluster_down.sh               # GPU billing stops when this returns
+```
+
+`port-forward` is what makes `config/base.yaml`'s
+`serving.base_url: http://localhost:8000/v1` correct unchanged, so every
+existing script (`scripts/generate_eval_replies.py`,
+`throughput_sweep.py`, `parity_check.py`) runs against the cluster with
+no edits. The Service is deliberately ClusterIP: nothing about this
+model should sit on a public address.
+
+### 9.2 Prerequisites that are not obvious
+
+| | |
+|---|---|
+| `gke-gcloud-auth-plugin` | **`kubectl` cannot talk to GKE without it** and it is not part of the Homebrew gcloud cask. `gcloud components install gke-gcloud-auth-plugin`, then symlink it onto PATH: `ln -sf /opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin /opt/homebrew/bin/`. The failure is `executable gke-gcloud-auth-plugin not found`, at the first `kubectl` call, after the cluster has already been created and started billing. |
+| Cloud Build service account | Projects created after ~2024 do not grant the Compute Engine default service account the roles a build needs. `deploy/build_push.sh` grants `roles/cloudbuild.builds.builder` itself. Without it the build fails with a **403 naming Cloud Storage**, not IAM — which sends you to the wrong page entirely. |
+| L4 quota | 1 in `asia-northeast3` (`NVIDIA_L4_GPUS`), which is exactly one node. Check before creating: `gcloud compute regions describe asia-northeast3 --format="json(quotas)"`. |
+
+### 9.3 Two failures worth expecting
+
+**Workload Identity does not take effect immediately.** The binding is
+correct the moment `cluster_up.sh` prints it, but the first pod scheduled
+right after still fails with:
+
+```
+ERROR: gcloud crashed (MetadataServerException): The request is rejected.
+Please check if the metadata server is concealed.
+```
+
+That message points at metadata concealment, which is not the problem —
+the binding simply has not propagated. Verify rather than guess, with a
+throwaway pod using the same service account:
+
+```bash
+kubectl run wi-test --restart=Never --image=gcr.io/google.com/cloudsdktool/google-cloud-cli:slim \
+  --overrides='{"spec":{"serviceAccountName":"serana"}}' \
+  --command -- bash -c 'curl -s -H "Metadata-Flavor: Google" \
+    http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email'
+kubectl logs wi-test        # should print serana-serving@<PROJECT>.iam.gserviceaccount.com
+```
+
+Once that prints the right account, `kubectl delete pod -l app=serana-vllm`
+and the recreated pod works. Measured here: it needed one delete, roughly
+two minutes after the binding was created.
+
+**The startup probe is the thing that makes or breaks the first deploy.**
+The 16 GB base model downloads into an emptyDir and then loads onto the
+card before `/health` answers. `deployment.yaml` allows 20 minutes
+(`periodSeconds: 15 x failureThreshold: 80`). With only a readiness or
+liveness probe at default settings, Kubernetes kills the pod long before
+the server is ever ready, and the symptom — a crash loop with no error in
+the container log — looks nothing like its cause.
+
+### 9.4 Timings measured on the first run
+
+| step | predicted | measured |
+|---|---|---|
+| image build (Cloud Build, 10 GB+ base) | 8-15 min | **see `artifacts/runs/p9_progress.md`** |
+| cluster + GPU node pool | 10-18 min | ~13 min |
+| adapters from GCS (init container) | - | seconds, 269 MiB/s |
+| pod start to `/health` | 10-15 min | see the progress log |
+
+---
+
+## 10. Quick reference
 
 ```bash
 gcloud compute instances list

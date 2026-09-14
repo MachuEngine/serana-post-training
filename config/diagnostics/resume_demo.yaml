@@ -1,0 +1,46 @@
+# Preemption/resume demonstration -- P9 step 3.
+#
+# What is being proved is a *mechanism*, not a number: that a run killed
+# mid-flight and restarted reattaches to the same W&B run and produces one
+# continuous loss curve, with checkpoints recovered from GCS rather than
+# from local disk.
+#
+# Deliberately local (Qwen3-0.6B on the M5), for two reasons. The mechanism
+# is device-independent -- the same src/finetune/train.py path runs 0.6B
+# here and 8B on the L4 -- and CLAUDE.md allows loss *shapes* from the
+# sandbox to be discussed even though values and speeds are not comparable
+# to GPU runs. Proving it on the L4 would cost GPU-hours to demonstrate
+# something the code either does or does not do.
+#
+# Diagnostics rule (§5.4): writes under artifacts/diagnostics/, never
+# produces a shipped adapter, gets no row in the results tables.
+name: resume-demo
+inherits: ../base.yaml
+model:
+  base_id: Qwen/Qwen3-0.6B
+train:
+  method: sft
+  output_adapter: artifacts/diagnostics/resume_demo
+  max_steps: 60
+  num_epochs: 1
+  # Frequent saves: the point is to have a checkpoint to come back to when
+  # the process is killed, not to save sparingly.
+  checkpoint_every_steps: 10
+  eval_steps: 10
+  grad_accum_steps: 2
+  data:
+    limit: 300
+  # Same bucket the real runs use, under a diagnostics-only adapter name,
+  # so the GCS round trip being exercised is the real one.
+  checkpoint_uri: gs://serana-post-training-ann10266/artifacts/diagnostics
+tracking:
+  # Online, and that is not incidental. Run offline, this demo loses the
+  # killed leg's history: offline mode buffers records into a local file
+  # and SIGKILL truncates it mid-write, so the points logged before the
+  # kill never reach the server even though the checkpoint and the run id
+  # survive. Measured here -- the first attempt uploaded only steps 35-60.
+  # Online streams each record as it is logged, so a hard kill loses at
+  # most the last partial write. The resume *mechanism* is identical
+  # either way; what differs is whether the record of the first leg
+  # exists to be resumed into.
+  mode: online

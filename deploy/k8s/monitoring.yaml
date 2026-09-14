@@ -1,0 +1,230 @@
+# Prometheus + Grafana, as plain manifests.
+#
+# GKE already runs Google Managed Prometheus on this cluster, and for pure
+# operations that would be the cheaper answer. Self-hosting is the choice
+# here because the deliverable is the scrape config and the dashboard as
+# reviewable files in the repo, not a console screenshot -- and because the
+# same two manifests run on any Kubernetes, not only GKE.
+#
+# Scraping is static rather than Kubernetes service discovery: there are
+# exactly two targets and they have fixed Service names, so discovery plus
+# the RBAC it needs would be machinery with nothing to find.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s        # short: load tests here last minutes, not hours
+      evaluation_interval: 15s
+    rule_files:
+      - /etc/prometheus/rules.yml
+    scrape_configs:
+      # Our service layer: request counts, latency histogram, error reasons.
+      - job_name: serana-gateway
+        static_configs:
+          - targets: ["serana-gateway:8080"]
+      # vLLM's own engine metrics: queue depth, KV-cache utilization, TTFT,
+      # token throughput. Already exposed -- nothing to instrument.
+      - job_name: vllm
+        static_configs:
+          - targets: ["serana-vllm:8000"]
+  rules.yml: |
+    groups:
+      - name: serana
+        rules:
+          # Two alerts only, both on user-visible symptoms rather than causes.
+          - alert: SeranaHighErrorRate
+            expr: |
+              (sum(rate(serana_requests_total{status="error"}[5m])) or vector(0))
+                / clamp_min(sum(rate(serana_requests_total[5m])), 0.001) > 0.05
+            for: 5m
+            labels:
+              severity: page
+            annotations:
+              summary: "over 5% of persona requests are failing"
+          - alert: SeranaSlowP95
+            expr: |
+              histogram_quantile(
+                0.95, sum(rate(serana_request_latency_seconds_bucket[5m])) by (le)
+              ) > 2
+            for: 5m
+            labels:
+              severity: warn
+            annotations:
+              summary: "p95 latency above 2s (P5 measured p95 0.42-0.84s)"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      # Same quota-forced placement as the gateway -- see deploy/k8s/gateway.yaml.
+      # CPU-only pods, no GPU request; they only ride on the L4 node because
+      # the default pool has no room and no second node can be created.
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.1.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            # The cluster is torn down between sessions, so retention past a
+            # few hours would only be storage nobody reads.
+            - --storage.tsdb.retention.time=6h
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: data
+              mountPath: /prometheus
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  type: ClusterIP
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: serana
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      # Same quota-forced placement as the gateway -- see deploy/k8s/gateway.yaml.
+      # CPU-only pods, no GPU request; they only ride on the L4 node because
+      # the default pool has no room and no second node can be created.
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.4.0
+          env:
+            # Anonymous admin. The Service is ClusterIP and reached only
+            # through port-forward, so there is no login to protect -- and a
+            # real password here would be a secret in a public repo.
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Admin
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts:
+            - name: provisioning-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: provisioning-dashboards
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: provisioning-datasources
+          configMap:
+            name: grafana-provisioning
+            items:
+              - key: datasource.yaml
+                path: datasource.yaml
+        - name: provisioning-dashboards
+          configMap:
+            name: grafana-provisioning
+            items:
+              - key: dashboards.yaml
+                path: dashboards.yaml
+        # Created by deploy/deploy_monitoring.sh from
+        # deploy/grafana/serana-dashboard.json, so the dashboard stays a
+        # readable file in the repo instead of JSON embedded in YAML.
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

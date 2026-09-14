@@ -1,0 +1,98 @@
+{
+  "captured_at": "2026-09-14T12:34:16.524550+00:00",
+  "note": "Load was 60 gateway requests at concurrency 4 while the parity check was independently driving vLLM. These are NOT clean performance numbers -- P5's isolated measurements are.",
+  "results": {
+    "gateway_request_rate_by_config": [
+      {
+        "labels": {
+          "config": "sft"
+        },
+        "value": 0.0689131707317073
+      },
+      {
+        "labels": {
+          "config": "dpo"
+        },
+        "value": 0.062302642178185916
+      },
+      {
+        "labels": {
+          "config": "b"
+        },
+        "value": 0.062302642178185916
+      }
+    ],
+    "gateway_error_ratio": [],
+    "gateway_latency_p50": [
+      {
+        "labels": {},
+        "value": 4.006487509082766
+      }
+    ],
+    "gateway_latency_p95": [
+      {
+        "labels": {},
+        "value": 7.60065274296551
+      }
+    ],
+    "vllm_kv_cache_usage": [
+      {
+        "labels": {
+          "__name__": "vllm:kv_cache_usage_perc",
+          "engine": "0",
+          "instance": "serana-vllm:8000",
+          "job": "vllm",
+          "model_name": "Qwen/Qwen3-8B"
+        },
+        "value": 0.0
+      }
+    ],
+    "vllm_requests_running": [
+      {
+        "labels": {
+          "__name__": "vllm:num_requests_running",
+          "engine": "0",
+          "instance": "serana-vllm:8000",
+          "job": "vllm",
+          "model_name": "Qwen/Qwen3-8B"
+        },
+        "value": 0.0
+      }
+    ],
+    "vllm_requests_waiting": [
+      {
+        "labels": {
+          "__name__": "vllm:num_requests_waiting",
+          "engine": "0",
+          "instance": "serana-vllm:8000",
+          "job": "vllm",
+          "model_name": "Qwen/Qwen3-8B"
+        },
+        "value": 0.0
+      }
+    ],
+    "vllm_generation_tokens_per_s": [
+      {
+        "labels": {
+          "engine": "0",
+          "instance": "serana-vllm:8000",
+          "job": "vllm",
+          "model_name": "Qwen/Qwen3-8B"
+        },
+        "value": 10.307395534883721
+      }
+    ],
+    "vllm_ttft_p95": [
+      {
+        "labels": {},
+        "value": 3.8472222222222197
+      }
+    ],
+    "gateway_completion_tokens_total": [
+      {
+        "labels": {},
+        "value": 2385.0
+      }
+    ]
+  }
+}

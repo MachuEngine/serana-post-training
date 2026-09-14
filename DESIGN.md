@@ -495,9 +495,28 @@ The interview value is being able to say *"gradient checkpointing cost me X% ste
 
 **Adapter overhead.** LoRA adds a per-token forward-pass cost. All configs share an identical prompt shape, so this is the only real serving-side variable. A near-zero delta is a legitimate finding — *"post-training bought quality at no serving cost."*
 
-### 7.5 Spot preemption as GPU ops
+### 7.5 Spot preemption as GPU ops, and one record per run
 
 Preemption is guaranteed on Spot, so treat recovery as a designed capability. Deliverables: the preemption event in the run log, the resumed loss curve showing continuity across the gap, and the wall-clock overhead of the restart.
+
+**Two gaps had to close before that curve could exist**, and both were live in the repo until P9.
+
+*The record was overwritten.* `run_report.json` was rewritten from scratch on every launch. Resuming worked — `get_last_checkpoint` plus `resume_from_checkpoint` — but the second leg's report replaced the first's. A run preempted twice had no record of its middle. `src/finetune/tracking.py` fixes this by attaching both legs to one **W&B** run: the run id is generated once, written next to the adapter as `wandb_run_id.txt`, and read back on resume, so continuity comes from a file that travels with the checkpoints rather than from an argument someone has to remember.
+
+*The checkpoints could not travel.* `train.checkpoint_uri` has been declared in `base.yaml` since P0 and no code read it — `train.py`'s own comment admitted local checkpoints were only sufficient "because the VM's `--instance-termination-action=STOP` keeps the boot disk alive". That covers a restarted *same* VM. It does not cover the case you actually hit when a zone runs out of capacity: creating a *new* VM, where everything not in GCS is gone. `src/finetune/gcs_sync.py` mirrors the adapter directory (checkpoints and the run id together) on every save, and pulls it back before training starts.
+
+**W&B rather than MLflow**, decided on this stack's constraints rather than on features:
+
+| | W&B | MLflow |
+|---|---|---|
+| Resume to the same run | `WANDB_RUN_ID` + `WANDB_RESUME`, honoured by TRL's Trainer with no glue | possible via `MLFLOW_RUN_ID`, but step collisions on a re-attached run need handling |
+| What has to stay alive | nothing | a tracking server, or a file backend — **on a Spot VM, the local file backend disappears with the VM, which is the failure being defended against** |
+
+`tracking.mode` is `online`, `offline` (records to disk, `wandb sync` uploads later — what a keyless machine uses), or `disabled`. Tracking failing must never be what kills a training run, so `gcs_sync` returns errors rather than raising and the run report records what actually happened: the restore result, every push, the run id, and the config hash.
+
+**Past runs were replayed, not abandoned.** Tracking arrived in P9, after CPT, SFT, both DPO attempts and both DDP legs had already run. `scripts/backfill_tracking.py` reads the `log_history` each `run_report.json` already contains and sends it, tagged `backfill` with its source path so a replayed history is never mistaken for a streamed one. Otherwise the project would open empty and the two most interesting results — the DPO null and the 2× L4 pair — would be the only ones missing.
+
+**The demonstration is local, deliberately.** `config/diagnostics/resume_demo.yaml` runs 0.6B on the M5, is killed mid-run, and is restarted. What is being proved is a mechanism the code either has or does not have, and it is device-independent — the same `train.py` path runs 0.6B here and 8B on the L4. Spending GPU-hours to watch the same two files be written would buy nothing. Per CLAUDE.md the loss *shape* from the sandbox is fair to discuss; its values and speeds are not comparable to GPU runs, and are not reported as such. Result: `artifacts/runs/p9_progress.md`.
 
 ### 7.6 Multi-GPU scaling, measured (DDP)
 
@@ -525,9 +544,47 @@ MFU by §7.3's convention (`6 × N_params × tokens / wall_seconds` over the L4'
 
 One environment caveat worth carrying: the run needs `NCCL_P2P_DISABLE=1`. Without it the first all-reduce hangs forever even though NCCL initialises and reports its P2P channels as connected — the tell is power draw, 31–35 W of 72 W while pinned at 100% utilization, against 67–73 W when actually training.
 
-### 7.7 What this section deliberately excludes
+### 7.7 Why DDP and not FSDP/ZeRO — the arithmetic
 
-Custom CUDA/Triton kernels, FSDP/DeepSpeed sharding, tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the other two are unnecessary when a 4-bit 8B fits one card. Plain DDP on 2× L4 (§7.6) is the honest multi-GPU version, and it is done.
+CLAUDE.md's scope table rules sharding out in one line ("a 4-bit 8B fits one L4; sharding would be theater"). That is the right call, but an assertion is not the same as the numbers, and this was the one decision in §7 stated without them. Here they are, derived from the parameter counts §7.1 already establishes (6.946B linear + 1.245B embeddings/head = 8.190B total; 18.9M trainable at r=16).
+
+*Units: decimal GB (10⁹ bytes), matching §7.6's 16.4 GB weight figure. Measured peaks quoted from `torch.cuda.max_memory_allocated()` are GiB, so a direct comparison carries a ~7% conversion — it never changes a conclusion here, where every margin is 4× or wider.*
+
+**What sharding would actually save on this workload.** The ZeRO stages shard progressively more, and LoRA has already removed most of what the first two target. Measured against §7.6's 2× L4 bf16 leg (19.37 GB peak per GPU):
+
+| | shards | saved per GPU | share of 19.37 GB |
+|---|---|---|---|
+| DDP (shipped) | nothing — each rank holds a full replica | — | — |
+| ZeRO-1 | optimizer state | 0.076 GB | 0.4% |
+| ZeRO-2 | + gradients | 0.094 GB | **0.5%** |
+| ZeRO-3 / FSDP `FULL_SHARD` | + the frozen base weights | 8.28 GB | 43% |
+
+ZeRO-1 and ZeRO-2 are pointless here for a reason specific to the method: they shard exactly the terms LoRA has already shrunk to nothing. Trainable parameters are 18.9M, so gradients are 38 MB and AdamW's two fp32 moments are 151 MB — the entire target of ZeRO-2 is **0.19 GB inside a 19.37 GB footprint**. Sharding what LoRA already made negligible is the definition of theater.
+
+ZeRO-3 is the honest case and deserves stating separately rather than being lumped in: it *does* save real memory — 8.28 GB — because it shards the 16.4 GB of frozen base weights that dominate the footprint. It is declined anyway, on three grounds:
+
+1. **Nothing to spend it on.** The bf16 leg peaked at 19.37 GB of 24, and the shipped 4-bit training config peaked at **9.64 GB** (§7.1's table) — roughly 13 GB spare on a single card. Freed memory is only worth its cost when it buys batch size, sequence length, or a bigger model. Here it buys headroom that already exists.
+2. **The cost is not small.** ZeRO-3 all-gathers the full parameter set once in the forward pass and again in the backward: ~16.4 GB of traffic per step per direction, against DDP's single **38 MB** all-reduce of the adapter — roughly **430× the communication**, to save memory nobody needs. §7.6's 99.1% scaling efficiency is a direct consequence of that 38 MB and would not survive the trade.
+3. **On the shipped 4-bit path it is not even straightforward.** The 4-bit base is ~6 GB (6.946B linear at ~0.5 bytes, 1.245B embeddings/head left in bf16), so ZeRO-3 across two cards saves ~3 GB. But bitsandbytes stores those weights as `Params4bit`, not ordinary tensors, and FSDP cannot flatten and shard them without the Answer.AI FSDP+QLoRA patch set. Real engineering cost against a ~3 GB saving on a run with 13 GB to spare.
+
+**Where sharding stops being optional.** Full fine-tuning the same model — no LoRA, bf16 weights, AdamW:
+
+| term | size |
+|---|---|
+| weights (bf16) | 16.4 GB |
+| gradients (bf16) | 16.4 GB |
+| AdamW moments (fp32 m, v) | 65.5 GB |
+| **floor** | **98.3 GB** |
+| + fp32 master copy (standard mixed precision) | 131.0 GB |
+| + activations | more |
+
+Under DDP every rank needs all of that resident, so **no number of L4s can run it**: 98.3 GB against ~22.5 GB usable per card is not a scaling problem, it is a wall. ZeRO-3/FSDP divides the 98.3 GB by rank count and turns it into an eight-card job. That is the regime the technique exists for, and this project is nowhere near it — which is the point of writing the number down rather than asserting the conclusion.
+
+**What would flip this.** A base model past ~30B, full fine-tuning instead of LoRA, or a sequence length long enough for activations to dominate. None are in scope (§3.5, §7.8). If one became so, the first move is to re-run this arithmetic, not to reach for the framework.
+
+### 7.8 What this section deliberately excludes
+
+Custom CUDA/Triton kernels and tensor parallelism. The first is weeks of work for a signal §7.2–§7.3 already provide; the second is unnecessary when a 4-bit 8B fits one card. FSDP/DeepSpeed sharding is excluded too — with the arithmetic behind that decision in §7.7, rather than as an assertion. Plain DDP on 2× L4 (§7.6) is the honest multi-GPU version, and it is done.
 
 ---
 

@@ -1,0 +1,15 @@
+# The build context is the repo root, but deploy/Dockerfile COPYs only
+# config/, two files from src/, and one script. Everything heavy or
+# secret is excluded from the context itself -- a COPY typo then cannot
+# leak .env or ship 4 GB of adapters to a registry.
+.git/
+.venv/
+.ruff_cache/
+.claude/
+artifacts/
+data/
+demo/
+**/__pycache__/
+*.log
+.env
+uv.lock

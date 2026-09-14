@@ -33,6 +33,7 @@ the model.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -82,8 +83,22 @@ def resolve_model_name(config: dict[str, Any]) -> str:
     return config["model"]["base_id"]
 
 
+def resolve_base_url(config: dict[str, Any]) -> str:
+    """Where the vLLM server is. `SERANA_BASE_URL` overrides the config
+    value, because this is the one setting that is a property of *where
+    the process runs* rather than of the experiment: on the laptop the
+    server is behind `kubectl port-forward` on localhost, while the
+    in-cluster gateway reaches it at the Service DNS name
+    (`http://serana-vllm:8000/v1`). Everything else still comes from
+    config/ -- CLAUDE.md's rule is about hyperparameters and model ids,
+    not about deployment topology."""
+    return os.environ.get("SERANA_BASE_URL") or config.get("serving", {}).get(
+        "base_url", "http://localhost:8000/v1"
+    )
+
+
 def _client(config: dict[str, Any]) -> OpenAI:
-    base_url = config.get("serving", {}).get("base_url", "http://localhost:8000/v1")
+    base_url = resolve_base_url(config)
     # vLLM's server doesn't check the key; the openai client requires a
     # non-empty string to construct.
     return OpenAI(base_url=base_url, api_key="not-needed")
