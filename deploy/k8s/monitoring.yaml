@@ -180,6 +180,14 @@ spec:
               value: Admin
             - name: GF_AUTH_DISABLE_LOGIN_FORM
               value: "true"
+            # Panel PNG rendering, so a dashboard can be captured as a file
+            # that outlives the cluster instead of only as a screenshot
+            # somebody has to take while the port-forward is open. Grafana
+            # dropped the bundled plugin in favour of this separate service.
+            - name: GF_RENDERING_SERVER_URL
+              value: http://grafana-renderer:8081/render
+            - name: GF_RENDERING_CALLBACK_URL
+              value: http://grafana:3000/
           ports:
             - name: http
               containerPort: 3000
@@ -227,4 +235,59 @@ spec:
   ports:
     - name: http
       port: 3000
+      targetPort: http
+---
+# Headless Chromium that Grafana calls to turn a panel into a PNG.
+# Separate deployment rather than a plugin inside the Grafana image: that
+# is what Grafana recommends now, and it keeps a ~400 MB browser out of
+# the image that only needs to serve a dashboard.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-renderer
+  labels:
+    app: grafana-renderer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-renderer
+  template:
+    metadata:
+      labels:
+        app: grafana-renderer
+    spec:
+      # Same quota-forced placement as the rest -- see deploy/k8s/gateway.yaml.
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+      containers:
+        - name: renderer
+          image: grafana/grafana-image-renderer:3.12.1
+          ports:
+            - name: http
+              containerPort: 8081
+          env:
+            - name: ENABLE_METRICS
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-renderer
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana-renderer
+  ports:
+    - name: http
+      port: 8081
       targetPort: http

@@ -3,39 +3,69 @@
   "uid": "serana-serving",
   "schemaVersion": 39,
   "refresh": "5s",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "panels": [
     {
       "type": "row",
       "title": "Service layer (src/serve/api.py)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
     },
     {
       "type": "timeseries",
       "title": "Request rate by config",
       "description": "Which of B/SFT/DPO traffic is actually going to. Split by config because that is the axis the results tables use.",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      },
       "targets": [
         {
           "expr": "sum by (config) (rate(serana_requests_total[1m]))",
           "legendFormat": "{{config}}"
         }
-      ]
+      ],
+      "id": 2
     },
     {
       "type": "stat",
       "title": "Error ratio (5m)",
       "description": "Alerting threshold is 5% -- see the SeranaHighErrorRate rule in deploy/k8s/monitoring.yaml. Two guards, both found by running it: clamp_min keeps the ratio defined when there is no traffic, and `or vector(0)` makes a clean run read 0% instead of No data -- with zero errors the numerator has no series at all, and an empty numerator empties the whole expression.",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 0.05 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
             ]
           }
         }
@@ -45,14 +75,24 @@
           "expr": "(sum(rate(serana_requests_total{status=\"error\"}[5m])) or vector(0)) / clamp_min(sum(rate(serana_requests_total[5m])), 0.001)",
           "legendFormat": "error ratio"
         }
-      ]
+      ],
+      "id": 3
     },
     {
       "type": "timeseries",
       "title": "Gateway latency p50 / p95 / p99",
       "description": "End-to-end, as a caller experiences it. P5 measured p50 0.091-0.247s and p95 0.42-0.84s at concurrency 8; anything far above that is the thing to explain.",
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
-      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum by (le) (rate(serana_request_latency_seconds_bucket[1m])))",
@@ -66,51 +106,109 @@
           "expr": "histogram_quantile(0.99, sum by (le) (rate(serana_request_latency_seconds_bucket[1m])))",
           "legendFormat": "p99"
         }
-      ]
+      ],
+      "id": 4
     },
     {
       "type": "row",
       "title": "Engine (vLLM)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 5
     },
     {
       "type": "timeseries",
       "title": "Running vs waiting requests",
       "description": "The queue is what the throughput/concurrency knee looks like live. P5 found the knee exactly at max_num_seqs=8: past that, requests wait instead of running.",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      },
       "targets": [
-        { "expr": "vllm:num_requests_running", "legendFormat": "running" },
-        { "expr": "vllm:num_requests_waiting", "legendFormat": "waiting" }
-      ]
+        {
+          "expr": "vllm:num_requests_running",
+          "legendFormat": "running"
+        },
+        {
+          "expr": "vllm:num_requests_waiting",
+          "legendFormat": "waiting"
+        }
+      ],
+      "id": 6
     },
     {
       "type": "timeseries",
       "title": "KV-cache utilization",
       "description": "The budget §7.4 predicted and then verified against vLLM's reported blocks, now as a live number.",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } },
-      "targets": [{ "expr": "vllm:kv_cache_usage_perc", "legendFormat": "kv cache" }]
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0
+        }
+      },
+      "targets": [
+        {
+          "expr": "vllm:kv_cache_usage_perc",
+          "legendFormat": "kv cache"
+        }
+      ],
+      "id": 7
     },
     {
       "type": "timeseries",
       "title": "Token throughput",
       "description": "Generation and prompt tokens per second. The AWQ-vs-bf16 comparison in the hardware table is this number under two configurations.",
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
-      "fieldConfig": { "defaults": { "unit": "none" } },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      },
       "targets": [
         {
           "expr": "rate(vllm:generation_tokens_total[1m])",
           "legendFormat": "generation tok/s"
         },
-        { "expr": "rate(vllm:prompt_tokens_total[1m])", "legendFormat": "prompt tok/s" }
-      ]
+        {
+          "expr": "rate(vllm:prompt_tokens_total[1m])",
+          "legendFormat": "prompt tok/s"
+        }
+      ],
+      "id": 8
     },
     {
       "type": "timeseries",
       "title": "Time to first token (engine p50 / p95)",
       "description": "Measured by vLLM itself rather than re-implemented in the gateway -- the engine sees the real first-token moment, a non-streaming caller does not.",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
-      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[1m])))",
@@ -120,14 +218,24 @@
           "expr": "histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[1m])))",
           "legendFormat": "TTFT p95"
         }
-      ]
+      ],
+      "id": 9
     },
     {
       "type": "timeseries",
       "title": "Queue time and preemptions",
       "description": "Queue time rising while KV-cache utilization is high is the signature of the engine being saturated rather than slow.",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
-      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le) (rate(vllm:request_queue_time_seconds_bucket[1m])))",
@@ -137,7 +245,8 @@
           "expr": "rate(vllm:num_preemptions_total[1m])",
           "legendFormat": "preemptions/s"
         }
-      ]
+      ],
+      "id": 10
     }
   ]
 }

@@ -418,6 +418,28 @@ Once that prints the right account, `kubectl delete pod -l app=serana-vllm`
 and the recreated pod works. Measured here: it needed one delete, roughly
 two minutes after the binding was created.
 
+**A GPU node reports `Ready` before its GPU is usable.** GKE installs the
+NVIDIA driver with a DaemonSet that runs *after* the node joins, so for a
+couple of minutes `kubectl get nodes` shows `Ready` while the pod sits in
+`Pending`:
+
+```
+Warning  FailedScheduling  0/2 nodes are available: 1 Insufficient nvidia.com/gpu, ...
+```
+
+Nothing is wrong; the scheduler is telling the truth. Check the node's
+allocatable GPUs rather than its status:
+
+```bash
+kubectl get node -l cloud.google.com/gke-accelerator=nvidia-l4 \
+  -o jsonpath='{.items[0].status.allocatable.nvidia\.com/gpu}'   # empty until ready
+kubectl get pods -n kube-system | grep nvidia                    # Init:1/4 while installing
+```
+
+It resolves itself and the pod schedules; no action needed beyond waiting.
+Worth knowing so the first minutes of a fresh cluster are not spent
+debugging a non-problem.
+
 **The startup probe is the thing that makes or breaks the first deploy.**
 The 16 GB base model downloads into an emptyDir and then loads onto the
 card before `/health` answers. `deployment.yaml` allows 20 minutes
