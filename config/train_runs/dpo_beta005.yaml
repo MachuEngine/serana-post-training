@@ -1,0 +1,13 @@
+# DPO β sweep (DESIGN.md §8), run 1 of 2. Continues the SAME SFT adapter
+# as the shipped serana-dpo (β=0.1); only train.dpo.beta and the output
+# path differ, so any delta vs serana-dpo is attributable to β alone.
+#
+# §8 extension, not a deliverable: this adapter gets its own eval pass in
+# the sweep write-up but does NOT replace serana-dpo in the DESIGN.md
+# §6.1 results tables (make_results_tables.py's CONFIGS list is unchanged).
+name: serana-dpo-beta005
+inherits: dpo.yaml
+train:
+  dpo:
+    beta: 0.05                        # weaker KL pull -> policy free to move further from SFT
+  output_adapter: artifacts/lora/serana-dpo-beta005

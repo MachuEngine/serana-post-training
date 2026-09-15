@@ -1,0 +1,5 @@
+# Serving/eval view of the β=0.3 sweep adapter. See dpo_beta005.yaml here.
+name: dpo_beta030              # label only -- pipeline must NOT branch on this
+inherits: ../base.yaml
+model_weights: lora
+lora_adapter_id: serana-dpo-beta030

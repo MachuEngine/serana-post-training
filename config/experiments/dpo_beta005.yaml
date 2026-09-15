@@ -1,0 +1,10 @@
+# Serving/eval view of the β=0.05 sweep adapter (DESIGN.md §8). Same
+# shape as dpo.yaml -- differs only in lora_adapter_id, so serve_up.py
+# auto-discovers it and generate_eval_replies.py / score_eval_replies.py
+# run against it with zero new inference code (CLAUDE.md single-pipeline
+# rule). Kept out of make_results_tables.py's CONFIGS list on purpose:
+# §8 sweeps get their own table, not a row in §6.1.
+name: dpo_beta005              # label only -- pipeline must NOT branch on this
+inherits: ../base.yaml
+model_weights: lora
+lora_adapter_id: serana-dpo-beta005

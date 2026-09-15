@@ -1,0 +1,9 @@
+# DPO β sweep (DESIGN.md §8), run 2 of 2. See dpo_beta005.yaml's header.
+# β=0.3 is the strong-KL end: policy held close to the SFT reference, so
+# the expected outcome is "even more like SFT than serana-dpo already is".
+name: serana-dpo-beta030
+inherits: dpo.yaml
+train:
+  dpo:
+    beta: 0.3                         # strong KL pull -> policy pinned near SFT
+  output_adapter: artifacts/lora/serana-dpo-beta030
