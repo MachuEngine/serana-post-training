@@ -1,0 +1,73 @@
+serana-post-training — third-party material and terms
+=====================================================
+
+The repository contains four kinds of material, and they are not under the
+same terms. `LICENSE` (MIT) covers the first only.
+
+1. Code — MIT
+----------------------------------------------------------------------
+Everything under `src/`, `scripts/`, `deploy/`, `demo/`, `config/`, plus
+`main.py` and the documentation. Use it as you like under `LICENSE`.
+
+
+2. Source dialogue — CC BY-SA
+----------------------------------------------------------------------
+The training corpora are derived from character dialogue on two wikis,
+both of which publish under Creative Commons Attribution-ShareAlike.
+Section-level attribution is recorded in `config/data_sources.yaml`.
+
+  UESP (primary)
+    https://en.uesp.net/wiki/Skyrim:Serana
+    Sections: Background, Quest-Related Events, Dialogue, Combat Dialogue,
+    Follower Dialogue
+
+  Elder Scrolls Wiki on Fandom (supplementary)
+    https://elderscrolls.fandom.com/wiki/Serana
+    Section: Quotes
+
+ShareAlike applies downstream: text derived from these sources carries the
+same licence and the same attribution requirement. That includes
+`data/ko/cpt_corpus.txt` and the real-pair portion of the SFT set. Note
+that 92.3% of the final SFT set is model-generated rather than wiki text
+(README, "Data composition"), but the two are mixed in one file, so treat
+the file as CC BY-SA rather than trying to separate them.
+
+
+3. The Elder Scrolls and Serana — Bethesda/ZeniMax
+----------------------------------------------------------------------
+"Serana", The Elder Scrolls, and Skyrim are the intellectual property of
+Bethesda Softworks / ZeniMax Media. This project is an unaffiliated,
+non-commercial engineering portfolio. It is not a product, it is not
+endorsed by Bethesda/ZeniMax, and nothing here should be read as a claim
+on their rights.
+
+Bethesda has never licensed the character for reuse. Publishing the code
+and the measurements is fair as engineering work; shipping a commercial
+product that impersonates their character is not, and this repository
+should not be used as a starting point for one.
+
+
+4. Trained adapters — non-commercial, and derived from all of the above
+----------------------------------------------------------------------
+  https://huggingface.co/machu8/serana-sft
+  https://huggingface.co/machu8/serana-dpo
+
+A LoRA adapter is derived from its training data, so these inherit every
+constraint above at once: the CC BY-SA obligations of the wiki text, the
+Bethesda IP position on the character, and the base model's own licence.
+
+  Base model: Qwen/Qwen3-8B, Apache 2.0. The adapters are weight deltas
+  and do not work without it, so its terms apply to any deployment.
+
+Released for research, study, and portfolio review. Not for commercial
+use.
+
+
+Evaluation and tooling
+----------------------------------------------------------------------
+  jhgan/ko-sroberta-multitask   embeddings, evaluation only
+  vllm/vllm-openai              container base image (Apache 2.0)
+  OpenAI API                    used as an LLM judge and for translation;
+                                outputs are subject to OpenAI's terms
+
+Questions about any of the above: open an issue on the repository.

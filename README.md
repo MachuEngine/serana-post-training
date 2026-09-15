@@ -16,7 +16,8 @@ English | [한국어](README.ko.md)
 [Operations layer](#operations-layer) ·
 [Data composition](#data-composition--the-circularity-guard) ·
 [Stack](#stack) ·
-[Reproducing](#reproducing)
+[Reproducing](#reproducing) ·
+[License](#license)
 
 ---
 
@@ -277,3 +278,17 @@ PPO/reward-model RLHF is deliberately excluded: policy + reference + reward + va
 Everything needed to reproduce end to end (config schema, build order, GPU-hour budget, prerequisites) is in `DESIGN.md` and `CLAUDE.md`. Runs on one 24GB GPU.
 
 `HARNESS_ENGINEERING.md` documents the guardrails (`.claude/hooks/`) used to keep an AI coding agent inside the project's scope and region constraints while building this.
+
+---
+
+## License
+
+Code is MIT ([`LICENSE`](LICENSE)). Three other things here are not, and
+[`NOTICE`](NOTICE) sets out each.
+
+| | Terms |
+|---|---|
+| Code (`src/`, `scripts/`, `deploy/`, `demo/`, `config/`, docs) | MIT |
+| Source wiki dialogue (UESP, Fandom) | CC BY-SA — the same terms and the attribution requirement travel to anything derived from it |
+| Serana and The Elder Scrolls | Property of Bethesda/ZeniMax. This repository is an unaffiliated, non-commercial portfolio |
+| The trained adapters | Inherit all three at once, plus the base model's own licence (`Qwen3-8B`, Apache 2.0). For research, study and portfolio review; not for commercial use |
