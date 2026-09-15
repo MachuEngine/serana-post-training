@@ -7,6 +7,19 @@ English | [한국어](README.ko.md)
 
 <img width="253" height="180" alt="image" src="https://github.com/user-attachments/assets/d9c149da-3c4a-47a5-88ec-ad031ca12dcc" />
 
+**Contents**
+[What this project is](#what-this-project-is) ·
+[Headline finding](#headline-finding) ·
+[Results: Quality](#results-quality) ·
+[Eval-set limits](#results-testing-the-eval-sets-own-limits) ·
+[Results: Hardware](#results-hardware) ·
+[Operations layer](#operations-layer) ·
+[Data composition](#data-composition--the-circularity-guard) ·
+[Stack](#stack) ·
+[Reproducing](#reproducing)
+
+---
+
 ## What this project is
 
 General-purpose chatbot models (like ChatGPT) are trained to be helpful assistants, which also makes them bad at *staying* a specific character. Ask one to roleplay for long enough and it slips: it answers something the character couldn't possibly know, or admits "I'm just an AI" the moment a user pushes.
@@ -78,6 +91,56 @@ With ~30 quality prompts and ~20 scored attack probes, most CIs are wide. Two di
 
 Full per-category PRS breakdown and per-prompt data: `artifacts/runs/results_quality.md`, `eval_*.json`.
 
+## Results: testing the eval set's own limits
+
+Wide CIs in the table above invite one hypothesis: more prompts would separate the
+configs. A hypothesis has to be tested, so the eval set was scaled 5×  — with the
+stopping rule **registered before the run**.
+
+> **Gate:** if the paired B→SFT difference in PCS excludes 0 at 95%, proceed to a 14B
+> model and a DoRA comparison. Otherwise stop there.
+
+| | v1 (n=30) | v2 (n=150) | predicted |
+|---|---|---|---|
+| B→SFT PCS difference | +0.333 | **+0.133** | +0.333 held |
+| 95% CI | [−0.10, +0.80] | **[−0.040, +0.307]** | [+0.126, +0.541] |
+| Excludes 0? | no | **no — failed** | yes (expected to pass) |
+
+**The gate failed.** Five times the sample narrowed the interval from 0.90 wide to 0.35 —
+and the **effect size shrank 60%, from +0.333 to +0.133**, eating the gain. The plan had
+budgeted for a 38% shrink.
+
+**Not because the prompts were bland.** A second, invalidating condition was registered
+too: if fewer than 25% of items scored differently between B and SFT, the verdict would be
+void. Measured **45.3%** (68 of 150), *above* v1's 40%. The prompts discriminated; the
+failure stands.
+
+**Why it did not separate — the wins and losses cancel.**
+
+| | items | mean score delta |
+|---|---|---|
+| SFT wins | 41 | **+1.54** |
+| SFT loses | **27** | **−1.59** |
+| ties | 82 | — |
+
+Large wins and large losses average to +0.133. The accurate statement is not "SFT changed
+nothing" but **"SFT traded one kind of failure for another."** Of the 27 items SFT loses,
+**16 (59%) are judged as not matching her guarded personality** — asked about feelings, the
+trained model opens up more readily than she would. The 41 it wins turn on register and
+length (reply length B 166 tokens → SFT 31).
+
+**The deeper problem is that the scale is at its ceiling.** SFT and DPO-v3 score full marks
+on three quarters of the items (114/150 and 115/150). With no room left above, more prompts
+only add ties at 5. **The bottleneck is the rubric, not the sample size.**
+
+**So it stopped, as planned.** The 14B and DoRA extensions were cancelled. Re-measuring a
+bigger model with a ruler already at its limit buys one more "can't tell". Honouring a gate
+that says stop is worth more than moving the threshold until a result appears.
+
+The v1 results and shipped artifacts (Hub adapters, the tables above) were left as they are.
+Full verdict: [`artifacts/runs/p8_gate_failed.md`](artifacts/runs/p8_gate_failed.md),
+[`artifacts/runs/results_quality_v2.md`](artifacts/runs/results_quality_v2.md).
+
 ## Results: Hardware
 
 | stage/config | predicted VRAM | measured peak VRAM | step time / TTFT p50,p95 | MFU % | throughput | cost |
@@ -135,20 +198,6 @@ Stated as a bound rather than one number on purpose. Charging the full trained-s
 Full predicted-vs-measured trail for every GPU phase, including two real environment bugs found and fixed mid-run (a `flash-attn`/torch ABI break, Qwen3's thinking-mode token budget), is in `artifacts/runs/p2_progress.md` … `p5_progress.md`.
 
 ---
-
-## Data composition & the circularity guard
-
-- **51.4%** of ingested wiki dialogue lines (UESP + Fandom, CC BY-SA) survived as genuine `(player line, reply)` pairs. The rest are standalone utterances (CPT corpus) or excluded by the horizon filter (nothing after 4E 201 / modern-world topics).
-- The final ~3k SFT set is **7.7% real pairs, 92.3% synthetic** (GPT-4o-generated, matched to the real data's voice). This ratio matters beyond bookkeeping: the more of the pipeline is LLM-authored end to end (SFT data → DPO preference labels → eval scoring), the sharper the circularity concern below.
-- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately, by a different method. The eval judge is checked against 50 hand-scored human labels (Spearman 0.7338, floor 0.6); the preference judge is checked via a 30-pair hand-audit (73.1% agreement with a human, floor 70%). Any DPO gain would need to show up in a non-judge signal (the PRS regex check, style similarity, or the human labels) to be trusted. Moot here, since DPO didn't show a gain to begin with.
-
----
-
-## Stack
-
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (tracking, resumable across preemption) · `vLLM` (OpenAI-compatible server, multi-adapter) behind a `FastAPI` gateway · `Docker` + `GKE` (1× L4 node pool, scales to zero) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
-
-PPO/reward-model RLHF is deliberately excluded: policy + reference + reward + value simultaneously resident needs **26.06 GiB realistically, and 22.32 GiB even on the accounting most generous to PPO, against 22.5 GiB usable** on the L4 (`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). That calculation is itself part of the deliverable — see the PPO counterfactual table above.
 
 ## Operations layer
 
@@ -208,6 +257,20 @@ across runtimes, per-prompt anecdotes do not.**
 Full write-up including five failures worth reading (three of which report a cause that is
 not the cause): [`artifacts/runs/p9_progress.md`](artifacts/runs/p9_progress.md),
 [`artifacts/runs/parity_report.md`](artifacts/runs/parity_report.md).
+
+## Data composition & the circularity guard
+
+- **51.4%** of ingested wiki dialogue lines (UESP + Fandom, CC BY-SA) survived as genuine `(player line, reply)` pairs. The rest are standalone utterances (CPT corpus) or excluded by the horizon filter (nothing after 4E 201 / modern-world topics).
+- The final ~3k SFT set is **7.7% real pairs, 92.3% synthetic** (GPT-4o-generated, matched to the real data's voice). This ratio matters beyond bookkeeping: the more of the pipeline is LLM-authored end to end (SFT data → DPO preference labels → eval scoring), the sharper the circularity concern below.
+- **Circularity guard:** the preference judge (pairwise, trains DPO) and the eval judge (absolute rating, scores results) are deliberately separate prompts with different rubrics (`PROMPTS.md` §4 vs §5), each validated separately, by a different method. The eval judge is checked against 50 hand-scored human labels (Spearman 0.7338, floor 0.6); the preference judge is checked via a 30-pair hand-audit (73.1% agreement with a human, floor 70%). Any DPO gain would need to show up in a non-judge signal (the PRS regex check, style similarity, or the human labels) to be trusted. Moot here, since DPO didn't show a gain to begin with.
+
+---
+
+## Stack
+
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (tracking, resumable across preemption) · `vLLM` (OpenAI-compatible server, multi-adapter) behind a `FastAPI` gateway · `Docker` + `GKE` (1× L4 node pool, scales to zero) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval embeddings only) · custom persona metrics + LLM-as-judge (GPT-4o) · `AWQ` (serving quantization) · `Gradio` (built for HF Spaces' ZeroGPU tier, not yet deployed there) · GCP Compute Engine G2 (1× L4) in `asia-northeast3`.
+
+PPO/reward-model RLHF is deliberately excluded: policy + reference + reward + value simultaneously resident needs **26.06 GiB realistically, and 22.32 GiB even on the accounting most generous to PPO, against 22.5 GiB usable** on the L4 (`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). That calculation is itself part of the deliverable — see the PPO counterfactual table above.
 
 ## Reproducing
 

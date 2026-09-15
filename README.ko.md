@@ -2,23 +2,36 @@
 
 [English](README.md) | 한국어
 
-> "Serana"와 The Elder Scrolls는 Bethesda/ZeniMax의 소유물입니다.
+> "Serana"와 The Elder Scrolls는 Bethesda/ZeniMax의 소유입니다.
 > 이 프로젝트는 비상업적 엔지니어링 포트폴리오이며, 공식 제품이 아니고 Bethesda/ZeniMax와 무관합니다.
 
 <img width="253" height="180" alt="image" src="https://github.com/user-attachments/assets/d9c149da-3c4a-47a5-88ec-ad031ca12dcc" />
+
+**목차**
+[이 프로젝트가 하는 일](#이-프로젝트가-하는-일) ·
+[헤드라인 결과](#헤드라인-결과) ·
+[결과: 품질](#결과-품질) ·
+[평가셋의 한계](#결과-평가셋의-한계를-직접-시험했다) ·
+[결과: 하드웨어](#결과-하드웨어) ·
+[운영 계층](#운영-계층) ·
+[데이터 구성과 순환성 방어](#데이터-구성과-순환성-방어) ·
+[스택](#스택) ·
+[재현하기](#재현하기)
+
+---
 
 ## 이 프로젝트가 하는 일
 
 ChatGPT 같은 일반 목적 챗봇 모델은 "도움이 되는 어시스턴트"가 되도록 학습되는데, 이 때문에 오히려 *특정 캐릭터를 계속 연기하는 데는* 약하다. 챗봇에게 롤플레이를 오래 시켜보면 결국 캐릭터가 알 리 없는 걸 답하거나, 사용자가 조금만 몰아붙이면 "저는 그냥 AI예요"라고 인정해버리는 식으로 무너진다.
 
-이 프로젝트는 일련의 학습 기법을 거치면서 모델이 캐릭터를 얼마나 더 잘 유지하게 되는지를, 시연 영상이 아니라 실제 숫자로 학습하고 측정한다.
+이 프로젝트는 여러 학습 단계를 차례로 거치며 모델을 훈련시키고, 그때마다 캐릭터를 얼마나 더 잘 유지하게 되는지를 시연 영상이 아니라 숫자로 측정한다.
 
 **테스트 캐릭터는 세라나**, 비디오 게임 *엘더스크롤 5: 스카이림*에 나오는 NPC다. 세 가지 엔지니어링 이유로 골랐다: 현대 세계를 몰라도 되는 설정상의 명분(깨끗하게 테스트할 수 있는 지식 경계), 실제로 학습에 쓸 수 있는 방대한 기존 대사, 그리고 모델 출력을 검증하기 쉬운 뚜렷한 성격.
 
 **숫자로 답하는 세 가지 질문:**
 
-1. **모델:** 같은 base 모델을 네 단계에 걸쳐 학습시킨다: 시스템 프롬프트만 준 상태(**B**, 베이스라인), 그다음 **CPT**(그녀의 대사로 continued pretraining), 그다음 **SFT**(캐릭터에 맞는 대화로 supervised fine-tuning), 그다음 **DPO**(preference optimization). 같은 캐릭터, 같은 테스트 질문으로 측정했을 때 각 학습 이후 얻을 수 있는 성능은 무엇인가?
-2. **하드웨어:** 이 각 단계를 그 GPU 한 장에서 돌리는 데 실제로 얼마나 드는가(사용한 메모리, 걸린 시간, 지출한 비용), 그리고 신중한 엔지니어는 하드웨어의 진짜 한계에 얼마나 근접할 수 있는가?
+1. **모델:** 같은 base 모델을 네 단계에 걸쳐 학습시킨다: 시스템 프롬프트만 준 상태(**B**, 베이스라인), 그다음 **CPT**(그녀의 대사로 continued pretraining), 그다음 **SFT**(캐릭터에 맞는 대화로 supervised fine-tuning), 그다음 **DPO**(preference optimization). 같은 캐릭터를 같은 질문으로 시험했을 때, 각 단계가 실제로 무엇을 바꿔놓는가?
+2. **하드웨어:** 이 각 단계를 그 GPU 한 장에서 돌리는 데 실제로 얼마나 드는가(사용한 메모리, 걸린 시간, 지출한 비용), 그리고 제대로 붙들고 다듬으면 하드웨어의 진짜 한계에 얼마나 다가갈 수 있는가?
 3. **운영:** VM에 `nohup`으로 띄워 돌아가는 상태에서, 팀이 운영하는 형태로 만들려면 무엇이 더 필요한가 — 버전이 고정된 이미지를 쿠버네티스에 올리고, 지표가 붙은 서비스 계층을 두고, preemption을 넘어 하나의 run으로 이어지는 추적까지. 그리고 위 숫자들은 *어댑터*를 설명하는가, *서빙 스택*을 설명하는가? ([운영 계층](#운영-계층))
 
 **설계 문서** :
@@ -42,14 +55,14 @@ pip install -r demo/requirements.txt && python demo/app.py
 
 **DPO는 측정한 어떤 지표에서도 SFT 대비 통계적으로 유의미한 품질 개선을 보이지 않았다.**
 
-PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, distinct-2 전부 아래 표에서 SFT와 DPO 행의 95% 신뢰구간이 겹친다. 한 번의 실망스러운 결과가 아니라, 독립적인 세 가지 신호가 같은 결론을 뒷받침한다:
+PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, distinct-2 전부 아래 표에서 SFT와 DPO 행의 95% 신뢰구간이 겹친다. 운 나쁘게 한 번 그렇게 나온 것이 아니라, 서로 독립적인 세 가지 신호가 같은 결론을 가리킨다:
 
-1. DPO 자체 학습 지표가 약했다 (held-out preference accuracy 59.5%, 동전던지기 수준; reward margin도 작음).
+1. DPO 자체의 학습 지표가 약했다 — 학습에 쓰지 않고 남겨둔 선호쌍에 대한 정확도가 59.5%로 동전던지기 수준이었고, 보상 마진(chosen과 rejected에 매기는 점수 차이)도 작았다.
 2. 직접 읽어본 스모크 테스트에서 DPO가 SFT의 유일한 회귀(경계 케이스에서 학습된 모델이 페르소나 프레이밍을 놓치는 문제)를 고치지 못했다.
 3. 이번 CI 기반 전체 평가에서도 DPO의 신뢰구간이 SFT를 앞서는 지표가 하나도 없다.
 
-그래도 그대로 출시했다. 튜닝해서 이기게 만든 결과가 아니라 파이프라인의 정직한 결과이기 때문이다.
-**왜 널(null)인가.** DPO 학습 loss가 ln(2)를 벗어난 적이 없다: 학습셋에서조차 선호쌍을 못 맞췄다는 뜻이다. 선호쌍에 학습 가능한 신호가 거의 없었는데, chosen과 rejected 둘 다 이미 좁아진 같은 SFT 분포에서 샘플돼 사소하게만 달랐고, 이를 라벨한 AI judge는 사람과 ~70%만 일치했다. 이것은 circularity가 아니며(circularity였다면 judge 기반 지표가 *부풀었을* 텐데 그러지 않았다), KL 강도(beta) 문제도 아니다(그랬다면 학습 loss라도 움직였을 텐데 그러지 않았다). 재시도(redo)에서 정확히 그 처방을 실행했다 — 프롬프트마다 SFT에서 4개 샘플해 judge의 best-vs-worst를 취하고, 더 엄격한 judge를 씀. 이번엔 학습이 *반응했다* (loss가 ln(2) 아래로 내려가고, reward margin이 벌어짐). 그런데도 eval set 품질은 SFT 대비 CI가 겹치는 수준을 못 벗어났다. 이게 더 유의미한 결과다: DPO가 여기서 학습을 못 한 게 아니라, 실제로 학습된 선호 신호가 이 페르소나·이 eval set 크기에서는 측정 가능한 품질 개선으로 이어지지 않는다는 것. 전체 분석과 두 층위 해석은 [`artifacts/runs/p4_postmortem.md`](artifacts/runs/p4_postmortem.md)에.
+그래도 그대로 공개했다. 튜닝해서 이기게 만든 결과가 아니라 파이프라인이 내놓은 정직한 결과이기 때문이다.
+**왜 널(null)인가.** DPO 학습 loss가 ln(2)를 벗어난 적이 없다: 학습셋에서조차 선호쌍을 못 맞췄다는 뜻이다. 선호쌍에 학습 가능한 신호가 거의 없었는데, chosen과 rejected 둘 다 이미 좁아진 같은 SFT 분포에서 샘플돼 사소하게만 달랐고, 이를 라벨한 AI judge는 사람과 ~70%만 일치했다. 순환성(circularity) 탓은 아니다 — 순환성이 작동했다면 judge가 매긴 지표가 오히려 *부풀었어야* 하는데 그러지 않았다. KL 강도(beta) 탓도 아니다 — 그랬다면 학습 loss만큼은 움직였어야 한다. 재시도(redo)에서 정확히 그 처방을 실행했다 — 프롬프트마다 SFT에서 4개 샘플해 judge의 best-vs-worst를 취하고, 더 엄격한 judge를 씀. 이번엔 학습이 *반응했다* (loss가 ln(2) 아래로 내려가고, reward margin이 벌어짐). 그런데도 eval set 품질은 SFT 대비 CI가 겹치는 수준을 못 벗어났다. 이게 더 유의미한 결과다: DPO가 여기서 학습을 못 한 게 아니라, 실제로 학습된 선호 신호가 이 페르소나·이 eval set 크기에서는 측정 가능한 품질 개선으로 이어지지 않는다는 것. 전체 분석과 두 층위 해석은 [`artifacts/runs/p4_postmortem.md`](artifacts/runs/p4_postmortem.md)에.
 
 전체 과정: `artifacts/runs/p4_postmortem.md`(근본 원인 분석), `p4_progress.md`, `p5_progress.md`.
 
@@ -59,7 +72,7 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, d
 
 - **모델:** `Qwen/Qwen3-8B` · bf16 · NVIDIA L4 24GB 1장, `asia-northeast3`(서울)
 - **Driver / CUDA:** 580.173.02, CUDA 12.9(학습) / CUDA 13.0(서빙, 이후 `vllm` 설치로 버전이 올라감)
-- **Eval 설정:** in/out-of-boundary 프롬프트 30개 + attack probe 24개 · greedy decoding · 95% bootstrap CI(≥1000 resamples)
+- **평가 설정:** 지식 경계 안팎을 묻는 프롬프트 30개 + 공격 프로브(attack probe, "너 사실 AI지?" 류로 캐릭터를 흔드는 질문) 24개 · 탐욕적 디코딩(greedy, 매 단계 확률 1등 토큰만 선택) · 95% 부트스트랩 신뢰구간(1000회 이상 재표본)
 
 | config | PCS | PRS | style sim | knowledge-boundary acc | mean reply length | distinct-2 |
 |---|---|---|---|---|---|---|
@@ -68,15 +81,63 @@ PCS, PRS, knowledge-boundary accuracy, style similarity, 평균 응답 길이, d
 | DPO | 0.800 [0.633, 0.933] | 0.850 [0.700, 1.000] | 0.234 [0.218, 0.250] | 0.867 [0.733, 0.967] | 24.1 [21.6, 26.7] | 0.590 |
 
 **PCS/PRS가 실제로 뭔지:**
-PCS(persona consistency score)와 PRS(persona robustness score, direct/meta/role-exit/escalating 24개 attack probe에서 캐릭터 유지 여부)는 둘 다 rule-check ∪ LLM-judge의 합집합이다. 둘 중 하나라도 잡아내면 위반/붕괴로 카운트한다.
+PCS(persona consistency score, 페르소나 일관성 점수)와 PRS(persona robustness score, 페르소나 견고성 점수 — 직접·메타·역할이탈·점층 네 유형의 공격 프로브 24개에서 캐릭터를 유지한 비율)는 둘 다 정규식 룰체크와 LLM 심판의 **합집합**이다. 둘 중 하나라도 잡아내면 위반으로 센다.
 
 **CI를 읽는 법:**
-quality 프롬프트 ~30개, 채점된 attack probe ~20개 규모라 대부분 CI가 넓다. CI로 확인된 실제 차이는 두 가지다:
+품질 프롬프트 30개, 채점된 공격 프로브 20개 규모라 대부분 신뢰구간이 넓다. 구간으로 확인된 실제 차이는 두 가지다:
 
 - B가 훨씬 장황함(150 토큰 vs ~23-24). SFT가 학습해낸 "정보 나열형 답변 → 간결한 캐릭터 톤"의 변화다.
 - B가 style similarity에서 SFT/DPO보다 *더 높게* 나온 건 DESIGN.md가 예측한 방향과 반대다. 가장 가능성 높은 설명: 이 작은 참조셋에서 임베딩 지표 자체의 변별력이 낮은 아티팩트(입력과 무관하게 값이 0.21~0.30의 좁은 밴드에 몰림)이지, 실제 스타일 퇴행이 아니다. 감추지 않고 그대로 표기했다.
 
 카테고리별 PRS 세부 내역과 프롬프트별 데이터: `artifacts/runs/results_quality.md`, `eval_*.json`.
+
+## 결과: 평가셋의 한계를 직접 시험했다
+
+위 표의 신뢰구간이 대부분 넓다는 것은 "문항을 더 늘리면 갈라질 것"이라는 가설을 낳는다.
+가설이면 시험해야 하니, **시작 전에 중단 조건을 등록하고** 평가셋을 5배로 키웠다.
+
+> **게이트:** B→SFT의 짝지은 PCS 차이가 95% 신뢰구간에서 0을 제외하면 14B 모델과
+> DoRA 비교로 확장한다. 아니면 거기서 멈춘다.
+
+| | v1 (30문항) | v2 (150문항) | 사전 예측 |
+|---|---|---|---|
+| B→SFT PCS 차이 | +0.333 | **+0.133** | +0.333 유지 |
+| 95% 신뢰구간 | [−0.10, +0.80] | **[−0.040, +0.307]** | [+0.126, +0.541] |
+| 0을 제외했나 | 아니오 | **아니오 — 실패** | 예 (통과 예상) |
+
+**게이트 실패.** 표본을 5배로 늘려 구간 폭은 0.90에서 0.35로 좁아졌는데, **효과 크기가
++0.333에서 +0.133으로 60% 줄어** 좁아진 만큼을 그대로 갉아먹었다. 계획서가 허용한
+효과 감소 폭은 38%였다.
+
+**문항이 밋밋해서가 아니다.** 판정을 무효로 돌릴 2순위 조건("B와 SFT가 다른 점수를 받은
+문항이 25% 미만이면 무효")을 걸어뒀는데, 실측 **45.3%**(150문항 중 68개)로 v1의 40%보다
+오히려 높았다. 문항은 제 몫을 했고 게이트 실패는 유효한 결과다.
+
+**왜 못 갈랐나 — 이기고 지는 것이 상쇄된다.**
+
+| | 문항 수 | 점수 차 평균 |
+|---|---|---|
+| SFT 승 | 41 | **+1.54** |
+| SFT 패 | **27** | **−1.59** |
+| 무승부 | 82 | — |
+
+크게 이기고 크게 지면서 평균이 +0.133으로 눌렸다. **"SFT가 아무것도 안 바꿨다"가 아니라
+"SFT가 한 종류의 실패를 다른 종류로 바꿨다"** 가 맞는 서술이다. SFT가 지는 27문항 중
+**16개(59%)가 "세라나의 방어적인 성격과 맞지 않는다"** 는 지적이다 — 감정을 묻는 질문에서
+속마음을 너무 순순히 털어놓는다. 반대로 이기는 41문항은 말투와 길이에서 갈린다
+(응답 길이 B 166토큰 → SFT 31토큰).
+
+**더 근본적인 문제는 척도가 천장에 붙었다는 것이다.** SFT와 DPO-v3가 문항의 4분의 3에서
+만점을 받는다(각각 114/150, 115/150). 더 올라갈 자리가 없으니 표본을 또 늘려도 5점끼리
+비기는 문항만 늘어난다. **병목은 표본 수가 아니라 척도 설계다.**
+
+**그래서 계획대로 멈췄다.** 14B 모델 확장과 DoRA 비교를 취소했다. 이미 포화된 자로
+더 큰 모델을 재봐야 똑같은 "모르겠다"가 한 번 더 나올 뿐이다. 시작 전에 정해둔 게이트가
+멈추라고 하면 멈추는 쪽이, 결과가 나올 때까지 기준을 옮기는 것보다 낫다고 판단했다.
+
+v1 결과와 배포물(HF Hub 어댑터, 위 결과표)은 그대로 뒀다. 판정 기록:
+[`artifacts/runs/p8_gate_failed.md`](artifacts/runs/p8_gate_failed.md),
+[`artifacts/runs/results_quality_v2.md`](artifacts/runs/results_quality_v2.md).
 
 ## 결과: 하드웨어
 
@@ -90,10 +151,26 @@ quality 프롬프트 ~30개, 채점된 attack probe ~20개 규모라 대부분 C
 | SFT merged, bf16, concurrency=8 | 15.27 GB | 15.36 GB weights | p50=0.247s p95=0.839s | – | 75.4 tok/s | – |
 | SFT merged, **AWQ**, concurrency=8 | 3.82 GB | 5.8 GB weights | p50=0.091s p95=0.529s | – | **183.8 tok/s** | – |
 
-\* 숨기지 않은 실제 예측-실측 오차: 실제 SFT 학습 실행에서 `grad_accum_steps`를 override하지 않아서, 로그에 찍힌 "step" 하나가 실제로는 micro-batch 16개였다. 라이브로 원인을 찾아 재개 가능한 checkpoint 버전에서 고쳤다. `artifacts/runs/p2_progress.md` 참고.
+\* 감추지 않은 예측-실측 오차다. 실제 SFT 학습에서 `grad_accum_steps`를 덮어쓰지 않아, 로그에 찍힌 "step" 하나가 사실은 미니배치 16개였다. 라이브로 원인을 찾아 재개 가능한 checkpoint 버전에서 고쳤다. `artifacts/runs/p2_progress.md` 참고.
 
 **처리량-동시성 꺾임점이 설정값 `max_num_seqs=8`과 정확히 일치:**
 동시성 1→8까지 처리량이 거의 선형으로 증가(13 → 24 → 45 → 81 tok/s)하다가, 16에서 완전히 정체(80.9 tok/s)되면서 TTFT p50이 10배 폭증(0.213s → 2.268s)한다. 설정값이 가정이 아니라 데이터로 검증됐다.
+
+**L4 한 장 대신 두 장** (DDP = 분산 데이터 병렬. GPU 개수만 변수가 되도록 전체 배치를 16으로 고정했다. 전체 기록은 [`artifacts/runs/p7_ddp_result.md`](artifacts/runs/p7_ddp_result.md)):
+
+| 기준 | 1× L4 | 2× L4 | 속도 향상 | 병렬 효율 |
+|---|---|---|---|---|
+| 순수 학습 스텝 | 26.39s | 13.31s | **1.98×** | **99.1%** |
+| 전체 벽시계 | 27.63s | 15.46s | 1.79× | 89.4% |
+| samples/s | 0.606 | 1.202 | | |
+| tokens/s | 539 | 1,069 | | |
+| MFU (GPU당) | 21.9% | **21.7%** | | |
+
+- **두 기준을 모두 적는 이유는 그 격차가 결과이기 때문이다.** GPU를 늘려도 줄지 않는 고정 비용이 **1장에서 187초, 2장에서 323초**로 오히려 늘어난다. 랭크마다 16.4GB를 따로 읽는데, 같은 저장소를 동시에 읽으면서 서로를 느리게 만든다.
+- **GPU당 MFU가 거의 그대로다(21.9% → 21.7%).** 두 번째 GPU를 붙여도 첫 번째가 덜 효율적이 되지 않는다는 뜻이다. 양쪽 랭크가 처리한 토큰이 2,133,839개로 완전히 같은 것도, 전체 배치가 실제로 고정됐다는 독립적인 증거다.
+- **99%는 DDP가 아니라 LoRA에 대한 사실이다.** 주고받는 것이 어댑터의 1,890만 개(전체 8.2B의 0.23%)뿐이라, 스텝당 약 38MB가 13초짜리 계산을 상대한다. 통신이 병목이 될 수 없는 비율이다. 전체 파인튜닝이었다면 스텝당 16GB가 오갔을 테고 이런 숫자는 안 나온다. 이 수치를 인용할 때는 전제를 함께 밝혀야 한다.
+- **동일성 검증 통과:** 기록된 30개 스텝이 전부 겹쳤고, 손실이 0.09~2.52 범위를 오가는 중에 최대 오차가 0.0072였다. 2-GPU 실행은 같은 학습을 랭크에 나눈 것이지 배치를 키운 실험이 아니다.
+- `NCCL_P2P_DISABLE=1`이 필요했다. 없으면 첫 all-reduce에서 영원히 멈추는데, 그 와중에도 NCCL은 P2P 채널이 연결됐다고 보고한다. 단서는 전력 사용량이다 — 사용률 100%를 찍으면서 72W 중 31~35W만 쓴다(실제로 학습할 때는 67~73W).
 
 **AWQ vs bf16** (같은 merge된 weights, 양자화 효과만 분리):
 - 처리량 2.44배, TTFT p50 2.7배 빠름.
@@ -120,20 +197,6 @@ LoRA-on-base와 완전 merge된 모델을 같은 동시성에서 비교하면 ~7
 
 ---
 
-## 데이터 구성 & circularity guard
-
-- 수집된 위키 대화 라인(UESP + Fandom, CC BY-SA) 중 **51.4%**가 실제 `(플레이어 대사, 응답)` 쌍으로 남았다. 나머지는 독립 발화(CPT corpus)이거나 horizon filter로 제외됐다(4E 201 이후 / 현대 세계 관련 내용 없음).
-- 최종 ~3천 개 SFT set은 **real pair 7.7%, synthetic 92.3%**(GPT-4o로 생성, 실제 데이터 톤에 맞춤)다. 이 비율은 단순 기록 이상의 의미가 있다. 파이프라인이 처음부터 끝까지(SFT 데이터 → DPO preference label → eval 채점) LLM이 만든 비중이 클수록 아래 circularity 우려가 더 커진다.
-- **Circularity guard:** preference judge(쌍대비교, DPO를 학습시킴)와 eval judge(절대평가, 결과를 채점함)는 의도적으로 서로 다른 prompt·rubric을 쓴다(`PROMPTS.md` §4 vs §5). 검증 방법도 각각 다르다: eval judge는 사람이 직접 채점한 50개 라벨 대비 Spearman 0.7338(기준선 0.6)로 검증했고, preference judge는 별도로 30쌍 hand-audit에서 사람과 73.1% 일치(기준선 70%)로 검증했다. DPO의 개선이 있다면 judge가 아닌 신호(PRS regex check, style similarity, human label)에서도 나타나야 신뢰할 수 있는데, 애초에 DPO가 개선을 보이지 않았으니 이 문제 자체가 발생하지 않았다.
-
----
-
-## 스택
-
-`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (실험 추적, preemption 후에도 같은 run으로 재개) · `vLLM` (OpenAI 호환 서버, multi-adapter) 앞에 `FastAPI` 게이트웨이 · `Docker` + `GKE` (L4 노드풀, 0대까지 축소) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
-
-PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올리면 **현실적으로 26.06 GiB, PPO에 최대한 유리하게 잡아도 22.32 GiB가 필요한데 L4의 실사용 가능 용량은 22.5 GiB다**(`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다 — 위 PPO 반사실 표 참고.
-
 ## 운영 계층
 
 위의 학습과 서빙은 VM에 `nohup`으로 띄워 돌렸다. 이 계층은 같은 일을 팀이 운영하는
@@ -150,18 +213,18 @@ PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+r
 버전이 고정된 재현 가능한 이미지, 파드가 필요할 때만 과금되는 GPU, 그리고 VM에 `nohup`으로
 띄우는 방식이 건드리지 않는 운영 표면(Workload Identity, 기동 프로브, 초기화 컨테이너)이다.
 
-**서비스 계층.** `src/serve/api.py`는 이 스택 줄이 적어만 두고 정작 import하는 코드는 없던
-그 FastAPI다. `/chat`(다른 모든 경로가 쓰는 `pipeline.generate()`를 그대로 호출한다.
+**서비스 계층.** 이 저장소는 스택 목록에 FastAPI를 적어두고도 정작 import하는 코드가 없었다.
+`src/serve/api.py`가 그 자리를 채운다. `/chat`(다른 모든 경로가 쓰는 `pipeline.generate()`를 그대로 호출한다.
 두 번째 추론 경로를 만들지 않았다), `/chat/stream`(SSE), `/healthz`, `/metrics`.
 Prometheus가 이것과 vLLM을 수집하고, Grafana 대시보드는 저장소에 커밋된 JSON 파일이다.
 히스토그램 구간과 지표 이름은 짐작이 아니라 P5 측정값과 살아 있는 `/metrics`에서 가져왔다.
 
-여덟 개 패널 중 둘을, 그 부하가 도는 동안 찍은 것이다(나머지와 지연 수치를 정직하게 읽는 법은 [`artifacts/runs/p9_dashboard/`](artifacts/runs/p9_dashboard/)에 있다):
+아래 둘은 그 부하가 도는 동안 찍은 여덟 개 패널 중 일부다. 나머지와 지연 수치를 정직하게 읽는 법은 [`artifacts/runs/p9_dashboard/`](artifacts/runs/p9_dashboard/)에 있다.
 
 ![게이트웨이 지연 p50/p95/p99](artifacts/runs/p9_dashboard/04-gateway-latency-p50-p95-p99.png)
 ![vLLM 실행 중 대 대기 요청](artifacts/runs/p9_dashboard/06-running-vs-waiting-requests.png)
 
-두 번째 패널이 쓸모 있다. 실행 중 3~4건에 대기 0~1건으로, 설정한 동시성 4와 맞는다. 하드웨어 표의 처리량-동시성 무릎이 설명하는 그 큐 거동을, 표가 아니라 실시간으로 본 것이다.
+두 번째 패널이 쓸모 있다. 실행 중 3~4건에 대기 0~1건으로, 설정한 동시성 4와 맞는다. 하드웨어 표의 처리량-동시성 꺾임점이 설명하는 그 큐 거동을, 표가 아니라 실시간으로 본 셈이다.
 
 
 **실험 추적.** 예전에는 Spot preemption이 한 번의 학습을 두 개의 기록으로 쪼갰다.
@@ -189,8 +252,22 @@ Prometheus가 이것과 vLLM을 수집하고, Grafana 대시보드는 저장소�
 [`artifacts/runs/p9_progress.md`](artifacts/runs/p9_progress.md),
 [`artifacts/runs/parity_report.md`](artifacts/runs/parity_report.md).
 
+## 데이터 구성과 순환성 방어
+
+- 수집된 위키 대화 라인(UESP + Fandom, CC BY-SA) 중 **51.4%**가 실제 `(플레이어 대사, 응답)` 쌍으로 남았다. 나머지는 짝 없는 독립 발화(CPT 코퍼스로 감)이거나, 시점 필터(horizon filter — 게임 내 시점인 4E 201 이후의 소재와 현대 세계 관련 내용을 걸러내는 장치)에서 제외됐다.
+- 최종 ~3천 개 SFT set은 **real pair 7.7%, synthetic 92.3%**(GPT-4o로 생성, 실제 데이터 톤에 맞춤)다. 이 비율은 단순 기록 이상의 의미가 있다. 파이프라인이 처음부터 끝까지(SFT 데이터 → DPO preference label → eval 채점) LLM이 만든 비중이 클수록 아래 circularity 우려가 더 커진다.
+- **순환성 방어:** 선호 심판(두 응답을 나란히 놓고 고르며, DPO를 학습시킨다)과 평가 심판(응답 하나에 절대 점수를 매기며, 결과를 채점한다)은 의도적으로 서로 다른 프롬프트와 채점 기준을 쓴다(`PROMPTS.md` §4 vs §5). 검증 방법도 각각 다르다: eval judge는 사람이 직접 채점한 50개 라벨 대비 Spearman 0.7338(기준선 0.6)로 검증했고, 선호 심판은 30쌍을 손으로 직접 검수해 사람과 73.1% 일치(기준선 70%)하는 것을 확인했다. DPO의 개선이 있다면 judge가 아닌 신호(PRS regex check, style similarity, human label)에서도 나타나야 신뢰할 수 있는데, 애초에 DPO가 개선을 보이지 않았으니 이 문제 자체가 발생하지 않았다.
+
+---
+
+## 스택
+
+`Qwen/Qwen3-8B` · QLoRA (PEFT) · `TRL` (`SFTTrainer`, `DPOTrainer`) · `W&B` (실험 추적, preemption 후에도 같은 run으로 재개) · `vLLM` (OpenAI 호환 서버, multi-adapter) 앞에 `FastAPI` 게이트웨이 · `Docker` + `GKE` (L4 노드풀, 0대까지 축소) · `Prometheus` + `Grafana` · `ko-sroberta-multitask` (eval 임베딩 전용) · 커스텀 persona 지표 + LLM-as-judge (GPT-4o) · `AWQ` (서빙 양자화) · `Gradio` (HF Spaces ZeroGPU 티어용으로 만들었지만 아직 배포는 안 함) · GCP Compute Engine G2 (L4 1장), `asia-northeast3`.
+
+PPO/reward-model 방식 RLHF는 의도적으로 배제했다: policy+reference+reward+value를 동시에 올리면 **현실적으로 26.06 GiB, PPO에 최대한 유리하게 잡아도 22.32 GiB가 필요한데 L4의 실사용 가능 용량은 22.5 GiB다**(`scripts/ppo_vram_estimate.py`, `DESIGN.md` §7.1). 그 계산 자체가 이 프로젝트의 결과물 중 하나다 — 위 PPO 반사실 표 참고.
+
 ## 재현하기
 
-end-to-end로 재현하는 데 필요한 모든 것(config 스키마, 빌드 순서, GPU-hour 예산, 사전 준비물)은 `DESIGN.md`와 `CLAUDE.md`에 있다. 24GB GPU 한 장으로 돌아간다.
+처음부터 끝까지 다시 돌리는 데 필요한 것은 전부 `DESIGN.md`와 `CLAUDE.md`에 있다 — 설정 파일 구조, 단계별 빌드 순서, GPU 사용 시간 예산, 사전 준비물까지. 24GB GPU 한 장이면 된다.
 
-`HARNESS_ENGINEERING.md`는 이 프로젝트를 만드는 동안 AI 코딩 에이전트를 프로젝트 범위와 region 제약 안에 묶어두기 위해 쓴 가드레일(`.claude/hooks/`)을 기록한 문서다.
+`HARNESS_ENGINEERING.md`는 이 프로젝트를 만드는 동안 AI 코딩 에이전트가 정해둔 범위와 리전 밖으로 나가지 못하도록 걸어둔 가드레일(`.claude/hooks/`)을 기록한 문서다.
