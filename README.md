@@ -15,10 +15,11 @@ This project trains and measures, with real numbers rather than a demo video, ho
 
 **The test character is Serana**, an NPC from the video game *The Elder Scrolls V: Skyrim*, picked for three engineering reasons: an in-universe excuse to know nothing about the modern world (a clean, testable knowledge boundary), a large body of existing dialogue to actually train on, and a well-defined personality to check model output against.
 
-**Two questions, with numbers:**
+**Three questions, with numbers:**
 
 1. **Model:** the same base model is pushed through four stages: a system prompt alone (**B**, the baseline), then **CPT** (continued pretraining on her dialogue), then **SFT** (supervised fine-tuning on in-character exchanges), then **DPO** (preference optimization). What does each stage actually buy, measured on the same character and the same test questions?
 2. **Hardware:** what does each of those stages *cost* to run on that single L4 GPU (memory used, time taken, dollars spent), and how close does a careful engineer get to the hardware's real ceiling?
+3. **Operations:** once it works on a VM driven by `nohup`, what does it take to run it the way a team would — a pinned image on Kubernetes, a service layer with metrics, and tracking that survives a preemption as one run? And do the numbers above describe the *adapter* or the *serving stack*? ([Operations layer](#operations-layer))
 
 **Companion docs:**
 - [`DESIGN.md`](DESIGN.md): full design rationale, hyperparameter-selection method, compute budget
@@ -172,6 +173,14 @@ uses, not a second inference path), `/chat/stream` (SSE), `/healthz`, `/metrics`
 Prometheus scrapes it and vLLM; the Grafana dashboard is a checked-in JSON file whose
 histogram buckets and metric names came from P5's measurements and a live `/metrics`
 rather than from guesses.
+
+Two of the eight panels, captured while that load ran (all eight, plus what they mean and how to read the latency honestly, are in [`artifacts/runs/p9_dashboard/`](artifacts/runs/p9_dashboard/)):
+
+![Gateway latency p50/p95/p99](artifacts/runs/p9_dashboard/04-gateway-latency-p50-p95-p99.png)
+![vLLM running vs waiting requests](artifacts/runs/p9_dashboard/06-running-vs-waiting-requests.png)
+
+The second panel is the useful one: 3-4 requests running against 0-1 waiting, matching the configured concurrency of 4. It is the same queue behaviour the throughput/concurrency knee in the hardware table describes, seen live instead of as a row.
+
 
 **Tracking.** A Spot preemption used to split a run into two records, because
 `run_report.json` was rewritten on every launch — and `train.checkpoint_uri`, declared
