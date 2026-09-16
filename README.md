@@ -224,7 +224,12 @@ Prometheus scrapes it and vLLM; the Grafana dashboard is a checked-in JSON file 
 histogram buckets and metric names came from P5's measurements and a live `/metrics`
 rather than from guesses.
 
-Two of the eight panels, captured while that load ran (all eight, plus what they mean and how to read the latency honestly, are in [`artifacts/runs/p9_dashboard/`](artifacts/runs/p9_dashboard/)):
+Load came from `scripts/gateway_load.py`: 120 requests at concurrency 4, rotating
+through all three configs — **all HTTP 200, zero errors**.
+
+Two of the eight panels, captured while that ran. The other six, and why the latency
+here is not a performance number, are in
+[`artifacts/runs/p9_dashboard/`](artifacts/runs/p9_dashboard/):
 
 ![Gateway latency p50/p95/p99](artifacts/runs/p9_dashboard/04-gateway-latency-p50-p95-p99.png)
 ![vLLM running vs waiting requests](artifacts/runs/p9_dashboard/06-running-vs-waiting-requests.png)
